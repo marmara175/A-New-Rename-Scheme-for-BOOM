@@ -35,6 +35,8 @@ class IssueUnitIO(issue_width: Int, num_wakeup_ports: Int)(implicit p: Parameter
    val iss_valids     = Vec(issue_width, Bool()).asOutput
    val iss_uops       = Vec(issue_width, new MicroOp().asOutput)
    val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width=VPREG_SZ))).flip
+   val wakeup_pdsts   = Vec(num_wakeup_ports, UInt(width=PPREG_SZ)).asInput
+   val wakeup_masks   = Vec(num_wakeup_ports, UInt(width=numIntPhysRegsParts)).asInput
 
    // tell the issue unit what each execution pipeline has in terms of functional units
    val fu_types       = Vec(issue_width, Bits(width=FUC_SZ)).asInput

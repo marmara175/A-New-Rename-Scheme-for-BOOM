@@ -28,7 +28,10 @@ class IssueSlotIO(num_wakeup_ports: Int)(implicit p: Parameters) extends BoomBun
    val kill           = Bool(INPUT) // pipeline flush
    val clear          = Bool(INPUT) // entry being moved elsewhere (not mutually exclusive with grant)
 
-   val wakeup_dsts    = Vec(num_wakeup_ports, Valid(UInt(width = VPREG_SZ))).flip
+   val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width = VPREG_SZ))).flip
+   val wakeup_pdsts   = Vec(num_wakeup_ports, UInt(width = PPREG_SZ)).asInput
+   val wakeup_masks   = Vec(num_wakeup_ports, UInt(width = numIntPhysRegsParts)).asInput
+
    val in_uop         = Valid(new MicroOp()).flip // if valid, this WILL overwrite an entry!
    val updated_uop    = new MicroOp().asOutput // the updated slot uop; will be shifted upwards in a collasping queue.
    val uop            = new MicroOp().asOutput // the current Slot's uop. Sent down the pipeline when issued.
@@ -163,15 +166,15 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
 
    for (i <- 0 until num_slow_wakeup_ports)
    {
-      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.vop1))
+      when (io.wakeup_vdsts(i).valid && (io.wakeup_vdsts(i).bits === slotUop.vop1))
       {
          out_p1 := Bool(true)
       }
-      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.vop2))
+      when (io.wakeup_vdsts(i).valid && (io.wakeup_vdsts(i).bits === slotUop.vop2))
       {
          out_p2 := Bool(true)
       }
-      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.vop3))
+      when (io.wakeup_vdsts(i).valid && (io.wakeup_vdsts(i).bits === slotUop.vop3))
       {
          out_p3 := Bool(true)
       }

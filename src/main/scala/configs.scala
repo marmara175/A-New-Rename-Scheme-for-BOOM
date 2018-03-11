@@ -42,7 +42,8 @@ class DefaultBoomConfig extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=20, iqType=IQT_FP.litValue)),
       numIntVPhysRegisters = 100,
       numIntPPhysRegisters = 100,
-      numFpPhysRegisters = 64,
+      numFpVPhysRegisters = 64,
+      numFpPPhysRegisters = 64,
       numLsuEntries = 16,
       maxBrCount = 8,
       btb = BTBsaParameters(nSets=64, nWays=4, nRAS=8, tagSz=20),
@@ -77,7 +78,8 @@ class WithSmallBooms extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=4, iqType=IQT_FP.litValue)),
       numIntVPhysRegisters = 56,
       numIntPPhysRegisters = 56,
-      numFpPhysRegisters = 48,
+      numFpVPhysRegisters = 48,
+      numFpPPhysRegisters = 48,
       numLsuEntries = 4,
       maxBrCount = 4,
       gshare = Some(GShareParameters(enabled = true, history_length=12))
@@ -105,7 +107,8 @@ class WithMediumBooms extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=10, iqType=IQT_FP.litValue)),
       numIntVPhysRegisters = 70,
       numIntPPhysRegisters = 70,
-      numFpPhysRegisters = 64,
+      numFpVPhysRegisters = 64,
+      numFpPPhysRegisters = 64,
       numLsuEntries = 16,
       maxBrCount = 8,
       regreadLatency = 1,
@@ -131,7 +134,8 @@ class WithMegaBooms extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=20, iqType=IQT_FP.litValue)), // TODO make this 2-wide issue
       numIntVPhysRegisters = 128,
       numIntPPhysRegisters = 128,
-      numFpPhysRegisters = 80,
+      numFpVPhysRegisters = 80,
+      numFpPPhysRegisters = 80,
       numLsuEntries = 32,
       gshare = Some(GShareParameters(enabled=true, history_length=15))
       // tage is unsupported in boomv2 for now.

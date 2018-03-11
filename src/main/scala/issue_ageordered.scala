@@ -80,7 +80,10 @@ class IssueUnitCollasping(
             issue_slots(i).in_uop.bits  := uops(i+j)
          }
       }
-      issue_slots(i).wakeup_dsts  := io.wakeup_vdsts
+      issue_slots(i).wakeup_vdsts := io.wakeup_vdsts
+      issue_slots(i).wakeup_pdsts := io.wakeup_pdsts
+      issue_slots(i).wakeup_masks := io.wakeup_masks
+
       issue_slots(i).brinfo       := io.brinfo
       issue_slots(i).kill         := io.flush_pipeline
       issue_slots(i).clear        := shamts_oh(i) =/= UInt(0)

@@ -25,7 +25,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    val fpIssueParams = issueParams.find(_.iqType == IQT_FP.litValue).get
    val num_ll_ports = 1 // hard-wired; used by mem port and i2f port.
    val num_wakeup_ports = fpIssueParams.issueWidth + num_ll_ports
-   val fp_preg_sz = log2Up(numFpPhysRegs)
+   val fp_vreg_sz = log2Up(numFpVPhysRegs)
 
    val io = new Bundle
    {
@@ -45,7 +45,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
 
       val wakeups          = Vec(num_wakeup_ports, Valid(new ExeUnitResp(fLen+1)))
       val wb_valids        = Vec(num_wakeup_ports, Bool()).asInput
-      val wb_vdsts         = Vec(num_wakeup_ports, UInt(width=fp_preg_sz)).asInput
+      val wb_vdsts         = Vec(num_wakeup_ports, UInt(width=fp_vreg_sz)).asInput
 
       //TODO -- hook up commit log stuff.
       val debug_tsc_reg    = UInt(INPUT, xLen)
@@ -58,7 +58,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    val issue_unit       = Module(new IssueUnitCollasping(
                            issueParams.find(_.iqType == IQT_FP.litValue).get,
                            num_wakeup_ports))
-   val fregfile         = Module(new RegisterFileBehavorial(numFpPhysRegs,
+   val fregfile         = Module(new RegisterFileBehavorial(numFpPPhysRegs,
                                  exe_units.withFilter(_.uses_iss_unit).map(e => e.num_rf_read_ports).sum,
                                  // TODO get rid of -1, as that's a write-port going to IRF
                                  exe_units.withFilter(_.uses_iss_unit).map(e => e.num_rf_write_ports).sum - 1 +
@@ -149,6 +149,11 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    {
       issue_wakeup.valid := writeback.valid
       issue_wakeup.bits  := writeback.bits.uop.vdst
+   }
+
+   for ( (pdst, mask) <- issue_unit.io.wakeup_pdsts zip issue_unit.io.wakeup_masks) {
+      pdst     := UInt(0)
+      mask     := ~Bits(0, width = numIntPhysRegsParts)
    }
 
    //-------------------------------------------------------------

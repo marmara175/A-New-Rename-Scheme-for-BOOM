@@ -21,7 +21,8 @@ case class BoomCoreParams(
    numLsuEntries: Int = 8,
    numIntVPhysRegisters: Int = 96,
    numIntPPhysRegisters: Int = 96,
-   numFpPhysRegisters: Int = 64,
+   numFpVPhysRegisters: Int = 64,
+   numFpPPhysRegisters: Int = 64,
    enableCustomRf: Boolean = false,
    enableCustomRfModel: Boolean = true,
    maxBrCount: Int = 4,
@@ -79,7 +80,8 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
 
    val numIntVPhysRegs  = boomParams.numIntVPhysRegisters // size of the integer virtual register file
    val numIntPPhysRegs  = boomParams.numIntPPhysRegisters // size of the integer physical register file
-   val numFpPhysRegs    = boomParams.numFpPhysRegisters  // size of the floating point physical register file
+   val numFpVPhysRegs   = boomParams.numFpVPhysRegisters  // size of the floating point physical register file
+   val numFpPPhysRegs   = boomParams.numFpPPhysRegisters   
 
    val numIntPhysRegsParts = 4
 
@@ -209,8 +211,10 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
    val LREG_SZ           = log2Up(LOGICAL_REG_COUNT)
    val IVPREG_SZ         = log2Up(numIntVPhysRegs)
    val IPPREG_SZ	 = log2Up(numIntPPhysRegs)
-   val FVPREG_SZ         = log2Up(numFpPhysRegs)
+   val FVPREG_SZ         = log2Up(numFpVPhysRegs)
+   val FPPREG_SZ         = log2Up(numFpPPhysRegs)
    val VPREG_SZ          = IVPREG_SZ max FVPREG_SZ
+   val PPREG_SZ          = IPPREG_SZ max FPPREG_SZ
    val MEM_ADDR_SZ       = log2Up(NUM_LSU_ENTRIES)
    val MAX_ST_COUNT      = (1 << MEM_ADDR_SZ)
    val MAX_LD_COUNT      = (1 << MEM_ADDR_SZ)
@@ -219,7 +223,7 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
    val BROB_ADDR_SZ      = log2Up(NUM_BROB_ENTRIES)
 
    require (numIntVPhysRegs >= (32 + DECODE_WIDTH))
-   require (numFpPhysRegs >= (32 + DECODE_WIDTH))
+   require (numFpVPhysRegs >= (32 + DECODE_WIDTH))
    require (MAX_BR_COUNT >=2)
    require (NUM_ROB_ROWS % 2 == 0)
    require (NUM_ROB_ENTRIES % DECODE_WIDTH == 0)

@@ -91,7 +91,7 @@ class RenameStage(
    num_fp_wb_ports: Int)
 (implicit p: Parameters) extends BoomModule()(p)
 {
-   val io = new RenameStageIO(pl_width, numIntVPhysRegs, numFpPhysRegs, num_int_wb_ports, num_fp_wb_ports)
+   val io = new RenameStageIO(pl_width, numIntVPhysRegs, numFpVPhysRegs, num_int_wb_ports, num_fp_wb_ports)
 
    // integer registers
    val i_l2v_maptable = Module(new RenameL2VMapTable(
@@ -126,15 +126,15 @@ class RenameStage(
       pl_width,
       RT_FLT.litValue,
       32,
-      numFpPhysRegs))
+      numFpVPhysRegs))
    val f_vfreelist = Module(new RenameVFreeList(
       pl_width,
       RT_FLT.litValue,
-      numFpPhysRegs))
+      numFpVPhysRegs))
    val fbusytable = Module(new BusyTable(
       pl_width,
       RT_FLT.litValue,
-      num_pregs = numFpPhysRegs,
+      num_pregs = numFpVPhysRegs,
       num_read_ports = pl_width*3,
       num_wb_ports = num_fp_wb_ports))
 

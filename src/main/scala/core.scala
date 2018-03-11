@@ -71,13 +71,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    val rename_stage     = Module(new RenameStage(DECODE_WIDTH, num_wakeup_ports, fp_pipeline.io.wakeups.length))
    val issue_units      = new boom.IssueUnits(num_wakeup_ports)
    val iregfile         = if (regreadLatency == 1 && enableCustomRf) {
-                              Module(new RegisterFileSeqCustomArray(numIntVPhysRegs,
+                              Module(new RegisterFileSeqCustomArray(numIntPPhysRegs,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_read_ports).sum,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_write_ports).sum,
                                  xLen,
                                  exe_units.bypassable_write_port_mask))
                           } else {
-                              Module(new RegisterFileBehavorial(numIntVPhysRegs,
+                              Module(new RegisterFileBehavorial(numIntPPhysRegs,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_read_ports).sum,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_write_ports).sum,
                                  xLen,
@@ -165,8 +165,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    println("   ROB Size              : " + NUM_ROB_ENTRIES)
    println("   Issue Window Size     : " + issueParams.map(_.numEntries) + iss_str)
    println("   Load/Store Unit Size  : " + NUM_LSU_ENTRIES + "/" + NUM_LSU_ENTRIES)
-   println("   Num Int Phys Registers: " + numIntVPhysRegs)
-   println("   Num FP  Phys Registers: " + numFpPhysRegs)
+   println("   Num Int Phys Registers: " + numIntPPhysRegs)
+   println("   Num FP  Phys Registers: " + numFpPPhysRegs)
    println("   Max Branch Count      : " + MAX_BR_COUNT)
    println("   BTB Size              : " +
       (if (enableBTB) ("" + boomParams.btb.nSets * boomParams.btb.nWays + " entries (" +
@@ -577,6 +577,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       issport.bits  := wakeup.bits.uop.vdst
 
       require (iu.io.wakeup_vdsts.length == int_wakeups.length)
+   }
+
+   for {iu <- issue_units
+        (pdst, mask) <- iu.io.wakeup_pdsts zip iu.io.wakeup_masks
+   }{
+      pdst    := UInt(0)
+      mask    := ~Bits(0, width = numIntPhysRegsParts)
    }
 
 

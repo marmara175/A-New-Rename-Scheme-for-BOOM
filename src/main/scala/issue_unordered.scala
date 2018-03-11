@@ -31,7 +31,9 @@ class IssueUnitStatic(
    {
       issue_slots(i).in_uop.valid := entry_wen_oh(i).orR
       issue_slots(i).in_uop.bits  := Mux1H(entry_wen_oh(i), dis_uops)
-      issue_slots(i).wakeup_dsts  := io.wakeup_vdsts
+      issue_slots(i).wakeup_vdsts := io.wakeup_vdsts
+      issue_slots(i).wakeup_pdsts := io.wakeup_pdsts
+      issue_slots(i).wakeup_masks := io.wakeup_masks
       issue_slots(i).brinfo       := io.brinfo
       issue_slots(i).kill         := io.flush_pipeline
       issue_slots(i).clear        := Bool(false)
