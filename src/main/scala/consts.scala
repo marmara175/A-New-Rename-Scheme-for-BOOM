@@ -126,7 +126,7 @@ trait ScalarOpConstants
    // Decode Stage Control Signals
    val RT_FIX   = UInt(0, 2)
    val RT_FLT   = UInt(1, 2)
-   val RT_PAS   = UInt(3, 2) // pass-through (pop1 := lrs1, etc)
+   val RT_PAS   = UInt(3, 2) // pass-through (vop1 := lrs1, etc)
    val RT_X     = UInt(2, 2) // not-a-register (but shouldn't get a busy-bit, etc.)
                              // TODO rename RT_NAR
 
@@ -304,7 +304,7 @@ trait ScalarOpConstants
       uop.fp_val     := Bool(false)
       uop.is_store   := Bool(false)
       uop.is_load    := Bool(false)
-      uop.pdst       := UInt(0)
+      uop.vdst       := UInt(0)
       uop.dst_rtype  := RT_X
       uop.valid      := Bool(false)
       // TODO these unnecessary? used in regread stage?

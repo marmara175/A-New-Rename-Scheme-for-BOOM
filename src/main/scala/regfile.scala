@@ -41,7 +41,7 @@ object WritePort
    {
       val wport = Wire(Decoupled(new RegisterFileWritePort(addr_width, data_width)))
       wport.valid := enq.valid
-      wport.bits.addr := enq.bits.uop.pdst
+      wport.bits.addr := enq.bits.uop.vdst
       wport.bits.data := enq.bits.data
       enq.ready := wport.ready
 
@@ -60,8 +60,8 @@ abstract class RegisterFile(
 {
    val io = new BoomBundle()(p)
    {
-      val read_ports = Vec(num_read_ports, new RegisterFileReadPortIO(PREG_SZ, register_width))
-      val write_ports = Vec(num_write_ports, Decoupled(new RegisterFileWritePort(PREG_SZ, register_width))).flip
+      val read_ports = Vec(num_read_ports, new RegisterFileReadPortIO(VPREG_SZ, register_width))
+      val write_ports = Vec(num_write_ports, Decoupled(new RegisterFileWritePort(VPREG_SZ, register_width))).flip
    }
 
    private val rf_cost = (num_read_ports+num_write_ports)*(num_read_ports+2*num_write_ports)

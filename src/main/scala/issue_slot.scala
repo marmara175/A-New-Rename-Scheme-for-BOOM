@@ -28,7 +28,7 @@ class IssueSlotIO(num_wakeup_ports: Int)(implicit p: Parameters) extends BoomBun
    val kill           = Bool(INPUT) // pipeline flush
    val clear          = Bool(INPUT) // entry being moved elsewhere (not mutually exclusive with grant)
 
-   val wakeup_dsts    = Vec(num_wakeup_ports, Valid(UInt(width = PREG_SZ))).flip
+   val wakeup_dsts    = Vec(num_wakeup_ports, Valid(UInt(width = VPREG_SZ))).flip
    val in_uop         = Valid(new MicroOp()).flip // if valid, this WILL overwrite an entry!
    val updated_uop    = new MicroOp().asOutput // the updated slot uop; will be shifted upwards in a collasping queue.
    val uop            = new MicroOp().asOutput // the current Slot's uop. Sent down the pipeline when issued.
@@ -150,9 +150,9 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
 
    when (io.in_uop.valid)
    {
-      next_p1 := !(io.in_uop.bits.prs1_busy)
-      next_p2 := !(io.in_uop.bits.prs2_busy)
-      next_p3 := !(io.in_uop.bits.prs3_busy)
+      next_p1 := io.in_uop.bits.rs1_mask != UInt(0)	//yqh
+      next_p2 := io.in_uop.bits.rs2_mask != UInt(0)
+      next_p3 := io.in_uop.bits.rs3_mask != UInt(0)
    }
    .otherwise
    {
@@ -163,15 +163,15 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
 
    for (i <- 0 until num_slow_wakeup_ports)
    {
-      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.pop1))
+      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.vop1))
       {
          out_p1 := Bool(true)
       }
-      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.pop2))
+      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.vop2))
       {
          out_p2 := Bool(true)
       }
-      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.pop3))
+      when (io.wakeup_dsts(i).valid && (io.wakeup_dsts(i).bits === slotUop.vop3))
       {
          out_p3 := Bool(true)
       }
@@ -226,10 +226,11 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    io.updated_uop.lrs1_rtype:= updated_lrs1_rtype
    io.updated_uop.lrs2_rtype:= updated_lrs2_rtype
    io.updated_uop.br_mask   := out_br_mask
-   io.updated_uop.prs1_busy := !out_p1
-   io.updated_uop.prs2_busy := !out_p2
-   io.updated_uop.prs3_busy := !out_p3
-
+   // yqh
+   io.updated_uop.rs1_mask := Mux(out_p1, ~Bits(0, width = numIntPhysRegsParts), Bits(0, width = numIntPhysRegsParts))	// ???
+   io.updated_uop.rs2_mask := Mux(out_p2, ~Bits(0, width = numIntPhysRegsParts), Bits(0, width = numIntPhysRegsParts))	// ???
+   io.updated_uop.rs3_mask := Mux(out_p3, ~Bits(0, width = numIntPhysRegsParts), Bits(0, width = numIntPhysRegsParts))	// ???
+ 
    when (slot_state === s_valid_2)
    {
       when (slot_p1 && slot_p2)

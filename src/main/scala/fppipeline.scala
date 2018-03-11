@@ -45,7 +45,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
 
       val wakeups          = Vec(num_wakeup_ports, Valid(new ExeUnitResp(fLen+1)))
       val wb_valids        = Vec(num_wakeup_ports, Bool()).asInput
-      val wb_pdsts         = Vec(num_wakeup_ports, UInt(width=fp_preg_sz)).asInput
+      val wb_vdsts         = Vec(num_wakeup_ports, UInt(width=fp_preg_sz)).asInput
 
       //TODO -- hook up commit log stuff.
       val debug_tsc_reg    = UInt(INPUT, xLen)
@@ -117,7 +117,8 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
          issue_unit.io.dis_uops(w).uopc := uopSTD
          issue_unit.io.dis_uops(w).fu_code := FUConstants.FU_FPU
          issue_unit.io.dis_uops(w).lrs1_rtype := RT_X
-         issue_unit.io.dis_uops(w).prs1_busy := Bool(false)
+		 // yqh
+         issue_unit.io.dis_uops(w).rs1_mask := ~Bits(0, width = numIntPhysRegsParts)
       }
    }
    io.dis_readys := issue_unit.io.dis_readys
@@ -144,10 +145,10 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    }
 
    // Wakeup
-   for ((writeback, issue_wakeup) <- io.wakeups zip issue_unit.io.wakeup_pdsts)
+   for ((writeback, issue_wakeup) <- io.wakeups zip issue_unit.io.wakeup_vdsts)
    {
       issue_wakeup.valid := writeback.valid
-      issue_wakeup.bits  := writeback.bits.uop.pdst
+      issue_wakeup.bits  := writeback.bits.uop.vdst
    }
 
    //-------------------------------------------------------------
@@ -218,9 +219,9 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       // Wakeup signal is sent on cycle S0, write is now delayed until end of S1,
       // but Issue happens on S1 and RegRead doesn't happen until S2 so we're safe.
       // (for regreadlatency >0).
-      fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), FPREG_SZ, fLen+1)
+      fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), FVPREG_SZ, fLen+1)
    } else {
-      fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, FPREG_SZ, fLen+1)
+      fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, FVPREG_SZ, fLen+1)
    }
 
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
@@ -247,7 +248,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             fregfile.io.write_ports(w_cnt).valid :=
                wbresp.valid &&
                wbresp.bits.uop.ctrl.rf_wen
-            fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.pdst
+            fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.vdst
             fregfile.io.write_ports(w_cnt).bits.data := wbresp.bits.data
             wbresp.ready := fregfile.io.write_ports(w_cnt).ready
          }

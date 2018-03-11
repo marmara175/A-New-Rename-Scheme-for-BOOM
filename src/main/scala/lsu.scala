@@ -85,7 +85,7 @@ class LoadStoreUnitIO(pl_width: Int)(implicit p: Parameters) extends BoomBundle(
    // TODO turn into forward bundle
    val forward_val        = Bool(OUTPUT)
    val forward_data       = UInt(OUTPUT, xLen)
-   val forward_uop        = new MicroOp().asOutput // the load microop (for its pdst)
+   val forward_uop        = new MicroOp().asOutput // the load microop (for its vdst)
 
    // Receive Memory Response
    val memresp            = new ValidIO(new MicroOp()).flip
@@ -535,7 +535,7 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
    {
       laq_addr_val      (exe_tlb_uop.ldq_idx)      := Bool(true)
       laq_addr          (exe_tlb_uop.ldq_idx)      := Mux(tlb_miss, exe_vaddr, exe_tlb_paddr)
-      laq_uop           (exe_tlb_uop.ldq_idx).pdst := exe_tlb_uop.pdst
+      laq_uop           (exe_tlb_uop.ldq_idx).vdst := exe_tlb_uop.vdst
       laq_is_virtual    (exe_tlb_uop.ldq_idx)      := tlb_miss
       laq_is_uncacheable(exe_tlb_uop.ldq_idx)      := tlb_addr_uncacheable && !tlb_miss
 
@@ -547,7 +547,7 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
    {
       saq_val       (exe_tlb_uop.stq_idx)      := !pf_st // prevent AMOs from executing!
       saq_addr      (exe_tlb_uop.stq_idx)      := Mux(tlb_miss, exe_vaddr, exe_tlb_paddr)
-      stq_uop       (exe_tlb_uop.stq_idx).pdst := exe_tlb_uop.pdst // needed for amo's TODO this is expensive,
+      stq_uop       (exe_tlb_uop.stq_idx).vdst := exe_tlb_uop.vdst // needed for amo's TODO this is expensive,
                                                                    // can we get around this?
       saq_is_virtual(exe_tlb_uop.stq_idx)      := tlb_miss
 

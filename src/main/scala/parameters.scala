@@ -19,7 +19,8 @@ case class BoomCoreParams(
          IssueParams(issueWidth=2, numEntries=16, iqType=IQT_INT.litValue),
          IssueParams(issueWidth=1, numEntries=16, iqType=IQT_FP.litValue)),
    numLsuEntries: Int = 8,
-   numIntPhysRegisters: Int = 96,
+   numIntVPhysRegisters: Int = 96,
+   numIntPPhysRegisters: Int = 96,
    numFpPhysRegisters: Int = 64,
    enableCustomRf: Boolean = false,
    enableCustomRfModel: Boolean = true,
@@ -76,9 +77,11 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
    val MAX_BR_COUNT     = boomParams.maxBrCount        // number of branches we can speculate simultaneously
    val fetchBufferSz    = boomParams.fetchBufferSz     // number of instructions that stored between fetch&decode
 
-   val numIntPhysRegs   = boomParams.numIntPhysRegisters // size of the integer physical register file
+   val numIntVPhysRegs  = boomParams.numIntVPhysRegisters // size of the integer virtual register file
+   val numIntPPhysRegs  = boomParams.numIntPPhysRegisters // size of the integer physical register file
    val numFpPhysRegs    = boomParams.numFpPhysRegisters  // size of the floating point physical register file
 
+   val numIntPhysRegsParts = 4
 
    val enableFetchBufferFlowThrough = boomParams.enableFetchBufferFlowThrough
 
@@ -204,9 +207,10 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
    // the f-registers are mapped into the space above the x-registers
    val LOGICAL_REG_COUNT = if (usingFPU) 64 else 32
    val LREG_SZ           = log2Up(LOGICAL_REG_COUNT)
-   val IPREG_SZ          = log2Up(numIntPhysRegs)
-   val FPREG_SZ          = log2Up(numFpPhysRegs)
-   val PREG_SZ          = IPREG_SZ max FPREG_SZ
+   val IVPREG_SZ         = log2Up(numIntVPhysRegs)
+   val IPPREG_SZ	 = log2Up(numIntPPhysRegs)
+   val FVPREG_SZ         = log2Up(numFpPhysRegs)
+   val VPREG_SZ          = IVPREG_SZ max FVPREG_SZ
    val MEM_ADDR_SZ       = log2Up(NUM_LSU_ENTRIES)
    val MAX_ST_COUNT      = (1 << MEM_ADDR_SZ)
    val MAX_LD_COUNT      = (1 << MEM_ADDR_SZ)
@@ -214,7 +218,7 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
    val NUM_BROB_ENTRIES  = NUM_ROB_ROWS //TODO explore smaller BROBs
    val BROB_ADDR_SZ      = log2Up(NUM_BROB_ENTRIES)
 
-   require (numIntPhysRegs >= (32 + DECODE_WIDTH))
+   require (numIntVPhysRegs >= (32 + DECODE_WIDTH))
    require (numFpPhysRegs >= (32 + DECODE_WIDTH))
    require (MAX_BR_COUNT >=2)
    require (NUM_ROB_ROWS % 2 == 0)

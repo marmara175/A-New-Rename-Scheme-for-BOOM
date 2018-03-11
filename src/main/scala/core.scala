@@ -71,13 +71,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    val rename_stage     = Module(new RenameStage(DECODE_WIDTH, num_wakeup_ports, fp_pipeline.io.wakeups.length))
    val issue_units      = new boom.IssueUnits(num_wakeup_ports)
    val iregfile         = if (regreadLatency == 1 && enableCustomRf) {
-                              Module(new RegisterFileSeqCustomArray(numIntPhysRegs,
+                              Module(new RegisterFileSeqCustomArray(numIntVPhysRegs,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_read_ports).sum,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_write_ports).sum,
                                  xLen,
                                  exe_units.bypassable_write_port_mask))
                           } else {
-                              Module(new RegisterFileBehavorial(numIntPhysRegs,
+                              Module(new RegisterFileBehavorial(numIntVPhysRegs,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_read_ports).sum,
                                  exe_units.withFilter(_.usesIRF).map(e => e.num_rf_write_ports).sum,
                                  xLen,
@@ -165,7 +165,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    println("   ROB Size              : " + NUM_ROB_ENTRIES)
    println("   Issue Window Size     : " + issueParams.map(_.numEntries) + iss_str)
    println("   Load/Store Unit Size  : " + NUM_LSU_ENTRIES + "/" + NUM_LSU_ENTRIES)
-   println("   Num Int Phys Registers: " + numIntPhysRegs)
+   println("   Num Int Phys Registers: " + numIntVPhysRegs)
    println("   Num FP  Phys Registers: " + numFpPhysRegs)
    println("   Max Branch Count      : " + MAX_BR_COUNT)
    println("   BTB Size              : " +
@@ -511,7 +511,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
       when (dis_uops(w).uopc === uopSTA && dis_uops(w).lrs2_rtype === RT_FLT) {
          iu.io.dis_uops(w).lrs2_rtype := RT_X
-         iu.io.dis_uops(w).prs2_busy := Bool(false)
+		 // yqh
+         iu.io.dis_uops(w).rs2_mask := ~Bits(0, width = numIntPhysRegsParts)
       }
    }
 
@@ -570,12 +571,12 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
    for {
       iu <- issue_units
-      (issport, wakeup) <- iu.io.wakeup_pdsts zip int_wakeups
+      (issport, wakeup) <- iu.io.wakeup_vdsts zip int_wakeups
    }{
       issport.valid := wakeup.valid
-      issport.bits  := wakeup.bits.uop.pdst
+      issport.bits  := wakeup.bits.uop.vdst
 
-      require (iu.io.wakeup_pdsts.length == int_wakeups.length)
+      require (iu.io.wakeup_vdsts.length == int_wakeups.length)
    }
 
 
@@ -733,7 +734,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       for (j <- 0 until exe_units(i).num_rf_write_ports)
       {
          val wbresp = exe_units(i).io.resp(j)
-         val wbpdst = wbresp.bits.uop.pdst
+         val wbvdst = wbresp.bits.uop.vdst
          val wbdata = wbresp.bits.data
 
          def wbIsValid(rtype: UInt) =
@@ -750,7 +751,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          if (exe_units(i).uses_csr_wport && (j == 0))
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
+            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst
             iregfile.io.write_ports(w_cnt).bits.data := Mux(wbReadsCSR, csr.io.rw.rdata, wbdata)
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
          }
@@ -769,7 +770,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          else
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
+            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst
             iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
          }
@@ -805,7 +806,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
    ll_wbarb.io.in(1) <> fp_pipeline.io.toint
-   iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, IPREG_SZ, xLen)
+   iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, IVPREG_SZ, xLen)
 
 
 
@@ -1132,25 +1133,25 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             , dis_uops(w).lrs1
             , dis_uops(w).lrs2
             , dis_uops(w).lrs3
-            , dis_uops(w).pdst
+            , dis_uops(w).vdst
             , Mux(dis_uops(w).dst_rtype   === RT_FIX, Str("X")
               , Mux(dis_uops(w).dst_rtype === RT_X  , Str("-")
               , Mux(dis_uops(w).dst_rtype === RT_FLT, Str("f")
               , Mux(dis_uops(w).dst_rtype === RT_PAS, Str("C"), Str("?")))))
-            , dis_uops(w).pop1
-            , Mux(rename_stage.io.ren2_uops(w).prs1_busy, Str("B"), Str("R"))
+            , dis_uops(w).vop1
+            , Mux(rename_stage.io.ren2_uops(w).rs1_mask === Bits(0), Str("B"), Str("R"))
             , Mux(dis_uops(w).lrs1_rtype    === RT_FIX, Str("X")
                , Mux(dis_uops(w).lrs1_rtype === RT_X  , Str("-")
                , Mux(dis_uops(w).lrs1_rtype === RT_FLT, Str("f")
                , Mux(dis_uops(w).lrs1_rtype === RT_PAS, Str("C"), Str("?")))))
-            , dis_uops(w).pop2
-            , Mux(rename_stage.io.ren2_uops(w).prs2_busy, Str("B"), Str("R"))
+            , dis_uops(w).vop2
+            , Mux(rename_stage.io.ren2_uops(w).rs2_mask === Bits(0), Str("B"), Str("R"))
             , Mux(dis_uops(w).lrs2_rtype    === RT_FIX, Str("X")
                , Mux(dis_uops(w).lrs2_rtype === RT_X  , Str("-")
                , Mux(dis_uops(w).lrs2_rtype === RT_FLT, Str("f")
                , Mux(dis_uops(w).lrs2_rtype === RT_PAS, Str("C"), Str("?")))))
-            , dis_uops(w).pop3
-            , Mux(rename_stage.io.ren2_uops(w).prs3_busy, Str("B"), Str("R"))
+            , dis_uops(w).vop3
+			, Mux(rename_stage.io.ren2_uops(w).rs3_mask === Bits(0), Str("B"), Str("R"))
             , Mux(dis_uops(w).frs3_en, Str("f"), Str("-"))
             )
       }
@@ -1181,15 +1182,15 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          , Mux(rob.io.com_xcpt.valid, Str("E"), Str("-"))
          , rob.io.com_xcpt.bits.cause
          , rob.io.commit.valids.toBits
-         , rename_stage.io.debug.ifreelist
-         , PopCount(rename_stage.io.debug.ifreelist)
+         , rename_stage.io.debug.i_vfreelist
+         , PopCount(rename_stage.io.debug.i_vfreelist)
          , rename_stage.io.debug.iisprlist
          , PopCount(rename_stage.io.debug.iisprlist)
          )
 
       printf("                                      fl: 0x%x (%d) is: 0x%x (%d)\n"
-         , rename_stage.io.debug.ffreelist
-         , PopCount(rename_stage.io.debug.ffreelist)
+         , rename_stage.io.debug.f_vfreelist
+         , PopCount(rename_stage.io.debug.f_vfreelist)
          , rename_stage.io.debug.fisprlist
          , PopCount(rename_stage.io.debug.fisprlist)
          )

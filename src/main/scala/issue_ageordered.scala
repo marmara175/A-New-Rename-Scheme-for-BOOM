@@ -80,7 +80,7 @@ class IssueUnitCollasping(
             issue_slots(i).in_uop.bits  := uops(i+j)
          }
       }
-      issue_slots(i).wakeup_dsts  := io.wakeup_pdsts
+      issue_slots(i).wakeup_dsts  := io.wakeup_vdsts
       issue_slots(i).brinfo       := io.brinfo
       issue_slots(i).kill         := io.flush_pipeline
       issue_slots(i).clear        := shamts_oh(i) =/= UInt(0)
@@ -107,9 +107,9 @@ class IssueUnitCollasping(
       io.iss_valids(w) := Bool(false)
       io.iss_uops(w)   := NullMicroOp
       // unsure if this is overkill
-      io.iss_uops(w).pop1 := UInt(0)
-      io.iss_uops(w).pop2 := UInt(0)
-      io.iss_uops(w).pop3 := UInt(0)
+      io.iss_uops(w).vop1 := UInt(0)
+      io.iss_uops(w).vop2 := UInt(0)
+      io.iss_uops(w).vop3 := UInt(0)
       io.iss_uops(w).lrs1_rtype := RT_X
       io.iss_uops(w).lrs2_rtype := RT_X
    }

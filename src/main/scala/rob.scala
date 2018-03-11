@@ -577,8 +577,8 @@ class Rob(width: Int,
                      !rob_val(GetRowIdx(rob_idx))),
                   "[ROB] writeback (" + i + ") occurred to an invalid ROB entry.")
          assert (!(io.wb_resps(i).valid && MatchBank(GetBankIdx(rob_idx)) &&
-                  temp_uop.ldst_val && temp_uop.pdst =/= io.wb_resps(i).bits.uop.pdst),
-                  "[ROB] writeback (" + i + ") occurred to the wrong pdst.")
+                  temp_uop.ldst_val && temp_uop.vdst =/= io.wb_resps(i).bits.uop.vdst),
+                  "[ROB] writeback (" + i + ") occurred to the wrong vdst.")
       }
       io.commit.uops(w).debug_wdata := rob_uop(rob_head).debug_wdata
 
@@ -1091,9 +1091,9 @@ class Rob(width: Int,
                  Mux(debug_entry(temp_idx).uop.dst_rtype === RT_PAS, Str("C"),
                  Mux(debug_entry(temp_idx).uop.dst_rtype === RT_FLT, Str("f"),
                  Mux(debug_entry(temp_idx).uop.dst_rtype === RT_X, Str("-"), Str("?")))))
-               , debug_entry    (temp_idx).uop.pdst
+               , debug_entry    (temp_idx).uop.vdst
                , debug_entry    (temp_idx).uop.br_mask
-               , debug_entry    (temp_idx).uop.stale_pdst
+               , debug_entry    (temp_idx).uop.stale_vdst
             )
             temp_idx = temp_idx + 1
          }

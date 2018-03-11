@@ -26,7 +26,8 @@ class DefaultBoomConfig extends Config((site, here, up) => {
          nPerfCounters = 29,
          nPerfEvents = 37,
          perfIncWidth = 3, // driven by issue ports, as set in BoomCoreParams.issueParams
-         fpu = Some(tile.FPUParams(sfmaLatency=4, dfmaLatency=4, divSqrt=true))),
+		 fpu = Some(tile.FPUParams(sfmaLatency=4, dfmaLatency=4, divSqrt=true))
+		 ),
       btb = Some(BTBParams(nEntries = 0, updatesOutOfOrder = true)),
       dcache = Some(DCacheParams(rowBits = site(L1toL2Config).beatBytes*8, nSets=64, nWays=8, nMSHRs=4, nTLBEntries=8)),
       icache = Some(ICacheParams(rowBits = site(L1toL2Config).beatBytes*8, nSets=64, nWays=8))
@@ -39,7 +40,8 @@ class DefaultBoomConfig extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=20, iqType=IQT_MEM.litValue),
          IssueParams(issueWidth=2, numEntries=20, iqType=IQT_INT.litValue),
          IssueParams(issueWidth=1, numEntries=20, iqType=IQT_FP.litValue)),
-      numIntPhysRegisters = 100,
+      numIntVPhysRegisters = 100,
+      numIntPPhysRegisters = 100,
       numFpPhysRegisters = 64,
       numLsuEntries = 16,
       maxBrCount = 8,
@@ -73,7 +75,8 @@ class WithSmallBooms extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=4, iqType=IQT_MEM.litValue),
          IssueParams(issueWidth=1, numEntries=4, iqType=IQT_INT.litValue),
          IssueParams(issueWidth=1, numEntries=4, iqType=IQT_FP.litValue)),
-      numIntPhysRegisters = 56,
+      numIntVPhysRegisters = 56,
+      numIntPPhysRegisters = 56,
       numFpPhysRegisters = 48,
       numLsuEntries = 4,
       maxBrCount = 4,
@@ -89,7 +92,8 @@ class WithMediumBooms extends Config((site, here, up) => {
          fWidth = 2,
          //nPerfCounters = 6,
          perfIncWidth = 3, // driven by issue ports, as set in BoomCoreParams.issueParams
-         fpu = Some(tile.FPUParams(sfmaLatency=4, dfmaLatency=4, divSqrt=true))),
+		 fpu = Some(tile.FPUParams(sfmaLatency=4, dfmaLatency=4, divSqrt=true))
+		 ),
       dcache = Some(DCacheParams(rowBits = site(L1toL2Config).beatBytes*8, nSets=64, nWays=4, nMSHRs=2, nTLBEntries=8)),
       icache = Some(ICacheParams(rowBits = site(L1toL2Config).beatBytes*8, nSets=64, nWays=4))
       )}
@@ -99,7 +103,8 @@ class WithMediumBooms extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=20, iqType=IQT_MEM.litValue),
          IssueParams(issueWidth=2, numEntries=16, iqType=IQT_INT.litValue),
          IssueParams(issueWidth=1, numEntries=10, iqType=IQT_FP.litValue)),
-      numIntPhysRegisters = 70,
+      numIntVPhysRegisters = 70,
+      numIntPPhysRegisters = 70,
       numFpPhysRegisters = 64,
       numLsuEntries = 16,
       maxBrCount = 8,
@@ -124,7 +129,8 @@ class WithMegaBooms extends Config((site, here, up) => {
          IssueParams(issueWidth=1, numEntries=20, iqType=IQT_MEM.litValue),
          IssueParams(issueWidth=2, numEntries=20, iqType=IQT_INT.litValue),
          IssueParams(issueWidth=1, numEntries=20, iqType=IQT_FP.litValue)), // TODO make this 2-wide issue
-      numIntPhysRegisters = 128,
+      numIntVPhysRegisters = 128,
+      numIntPPhysRegisters = 128,
       numFpPhysRegisters = 80,
       numLsuEntries = 32,
       gshare = Some(GShareParameters(enabled=true, history_length=15))

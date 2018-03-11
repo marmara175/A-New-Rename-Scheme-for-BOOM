@@ -34,7 +34,7 @@ class IssueUnitIO(issue_width: Int, num_wakeup_ports: Int)(implicit p: Parameter
 
    val iss_valids     = Vec(issue_width, Bool()).asOutput
    val iss_uops       = Vec(issue_width, new MicroOp().asOutput)
-   val wakeup_pdsts   = Vec(num_wakeup_ports, Valid(UInt(width=PREG_SZ))).flip
+   val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width=VPREG_SZ))).flip
 
    // tell the issue unit what each execution pipeline has in terms of functional units
    val fu_types       = Vec(issue_width, Bits(width=FUC_SZ)).asInput
@@ -116,10 +116,10 @@ abstract class IssueUnit(
             , Mux(issue_slots(i).debug.p1, Str("!"), Str(" "))
             , Mux(issue_slots(i).debug.p2, Str("!"), Str(" "))
             , Mux(issue_slots(i).debug.p3, Str("!"), Str(" "))
-            , issue_slots(i).uop.pop1
-            , issue_slots(i).uop.pop2
-            , issue_slots(i).uop.pop3
-            , issue_slots(i).uop.pdst
+            , issue_slots(i).uop.vop1
+            , issue_slots(i).uop.vop2
+            , issue_slots(i).uop.vop3
+            , issue_slots(i).uop.vdst
             , Mux(issue_slots(i).uop.dst_rtype === RT_FIX, Str("X"),
               Mux(issue_slots(i).uop.dst_rtype === RT_X, Str("-"),
               Mux(issue_slots(i).uop.dst_rtype === RT_FLT, Str("f"),
