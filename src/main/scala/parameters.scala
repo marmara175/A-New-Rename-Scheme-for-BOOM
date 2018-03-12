@@ -215,6 +215,7 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
    val FPPREG_SZ         = log2Up(numFpPPhysRegs)
    val VPREG_SZ          = IVPREG_SZ max FVPREG_SZ
    val PPREG_SZ          = IPPREG_SZ max FPPREG_SZ
+   val TPREG_SZ          = VPREG_SZ max PPREG_SZ
    val MEM_ADDR_SZ       = log2Up(NUM_LSU_ENTRIES)
    val MAX_ST_COUNT      = (1 << MEM_ADDR_SZ)
    val MAX_LD_COUNT      = (1 << MEM_ADDR_SZ)

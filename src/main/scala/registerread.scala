@@ -31,7 +31,7 @@ class RegisterReadIO(
    val iss_uops   = Vec(issue_width, new MicroOp()).asInput
 
    // interface with register file's read ports
-   val rf_read_ports = Vec(num_total_read_ports, new RegisterFileReadPortIO(VPREG_SZ, register_width)).flip
+   val rf_read_ports = Vec(num_total_read_ports, new RegisterFileReadPortIO(TPREG_SZ, register_width)).flip
 
    val bypass = new BypassData(num_total_bypass_ports, register_width).asInput
 
@@ -111,9 +111,14 @@ class RegisterRead(
       // If rrdLatency==1, we need to send read address at end of ISS stage,
       //    in order to get read data back at end of RRD stage.
       require (regreadLatency == 0 || regreadLatency == 1)
-      val rs1_addr = io.iss_uops(w).vop1
-      val rs2_addr = io.iss_uops(w).vop2
-      val rs3_addr = io.iss_uops(w).vop3
+      // yqh
+      val rs1_addr = io.iss_uops(w).pop1
+      val rs2_addr = io.iss_uops(w).pop2
+      val rs3_addr = io.iss_uops(w).pop3
+
+      //val rs1_addr = io.iss_uops(w).vop1
+      //val rs2_addr = io.iss_uops(w).vop2
+      //val rs3_addr = io.iss_uops(w).vop3
 
       if (num_read_ports > 0) io.rf_read_ports(idx+0).addr := rs1_addr
       if (num_read_ports > 1) io.rf_read_ports(idx+1).addr := rs2_addr

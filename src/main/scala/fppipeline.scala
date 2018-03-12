@@ -224,9 +224,9 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       // Wakeup signal is sent on cycle S0, write is now delayed until end of S1,
       // but Issue happens on S1 and RegRead doesn't happen until S2 so we're safe.
       // (for regreadlatency >0).
-      fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), FVPREG_SZ, fLen+1)
+      fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), TPREG_SZ, fLen+1)
    } else {
-      fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, FVPREG_SZ, fLen+1)
+      fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, TPREG_SZ, fLen+1)
    }
 
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
@@ -253,7 +253,8 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             fregfile.io.write_ports(w_cnt).valid :=
                wbresp.valid &&
                wbresp.bits.uop.ctrl.rf_wen
-            fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.vdst
+            //fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.vdst
+            fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.pdst
             fregfile.io.write_ports(w_cnt).bits.data := wbresp.bits.data
             wbresp.ready := fregfile.io.write_ports(w_cnt).ready
          }

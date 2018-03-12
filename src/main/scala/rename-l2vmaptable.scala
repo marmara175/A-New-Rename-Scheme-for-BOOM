@@ -15,10 +15,10 @@ import config.Parameters
 
 class RenameL2VMapTableElementIo(pl_width: Int)(implicit p: Parameters) extends BoomBundle()(p)
 {
-   val element            = UInt(OUTPUT, VPREG_SZ)
+   val element            = UInt(OUTPUT, TPREG_SZ)
 
    val wens               = Vec(pl_width, Bool()).asInput
-   val ren_vdsts          = Vec(pl_width, UInt(width=VPREG_SZ)).asInput
+   val ren_vdsts          = Vec(pl_width, UInt(width=TPREG_SZ)).asInput
 
    val ren_br_vals        = Vec(pl_width, Bool()).asInput
    val ren_br_tags        = Vec(pl_width, UInt(width=BR_TAG_SZ)).asInput
@@ -29,13 +29,13 @@ class RenameL2VMapTableElementIo(pl_width: Int)(implicit p: Parameters) extends 
    // rollback (on exceptions)
    // TODO REMOVE THIS ROLLBACK PORT, since wens is mutually exclusive with rollback_wens
    val rollback_wen        = Bool(INPUT)
-   val rollback_stale_vdst = UInt(INPUT, VPREG_SZ)
+   val rollback_stale_vdst = UInt(INPUT, TPREG_SZ)
 
    // TODO scr option
    val flush_pipeline      = Bool(INPUT)
    val commit_wen          = Bool(INPUT)
-   val commit_vdst         = UInt(INPUT, VPREG_SZ)
-   val committed_element   = UInt(OUTPUT, VPREG_SZ)
+   val commit_vdst         = UInt(INPUT, TPREG_SZ)
+   val committed_element   = UInt(OUTPUT, TPREG_SZ)
 
    override def cloneType: this.type = new RenameL2VMapTableElementIo(pl_width).asInstanceOf[this.type]
 }
@@ -52,10 +52,10 @@ class RenameL2VMapTableElement(pipeline_width: Int, always_zero: Boolean)(implic
    // out in the meantime. A software solution is also possible, but I'm
    // unwilling to trust that.
 
-   val element = Reg(init = UInt(0, VPREG_SZ))
+   val element = Reg(init = UInt(0, TPREG_SZ))
 
    // handle branch speculation
-   val element_br_copies = Mem(MAX_BR_COUNT, UInt(width = VPREG_SZ))
+   val element_br_copies = Mem(MAX_BR_COUNT, UInt(width = TPREG_SZ))
 
 
    // this is possibly the hardest piece of code I have ever had to reason about in my LIFE.
@@ -69,7 +69,7 @@ class RenameL2VMapTableElement(pipeline_width: Int, always_zero: Boolean)(implic
 
    for (w <- 0 until pipeline_width)
    {
-      var elm_cases = Array((Bool(false),  UInt(0,VPREG_SZ)))
+      var elm_cases = Array((Bool(false),  UInt(0,TPREG_SZ)))
 
       for (xx <- w to 0 by -1)
       {
@@ -102,7 +102,7 @@ class RenameL2VMapTableElement(pipeline_width: Int, always_zero: Boolean)(implic
 
    if (ENABLE_COMMIT_MAP_TABLE)
    {
-      val committed_element = Reg(init=UInt(0,VPREG_SZ))
+      val committed_element = Reg(init=UInt(0,TPREG_SZ))
       when (io.commit_wen)
       {
          committed_element := io.commit_vdst
@@ -226,7 +226,7 @@ class RenameL2VMapTable(
    }
 
    // Read out the map-table entries ASAP, then deal with bypassing busy-bits later.
-   private val map_table_output = Seq.fill(pl_width*3)(Wire(UInt(width=VPREG_SZ)))
+   private val map_table_output = Seq.fill(pl_width*3)(Wire(UInt(width=TPREG_SZ)))
    def map_table_vrs1(w:Int) = map_table_output(w+0*pl_width)
    def map_table_vrs2(w:Int) = map_table_output(w+1*pl_width)
    def map_table_vrs3(w:Int) = map_table_output(w+2*pl_width)
@@ -246,10 +246,10 @@ class RenameL2VMapTable(
    // Bypass the virtual physical register mappings
    for (w <- 0 until pl_width)
    {
-      var rs1_cases =  Array((Bool(false),  UInt(0,VPREG_SZ)))
-      var rs2_cases =  Array((Bool(false),  UInt(0,VPREG_SZ)))
-      var rs3_cases =  Array((Bool(false),  UInt(0,VPREG_SZ)))
-      var stale_cases= Array((Bool(false),  UInt(0,VPREG_SZ)))
+      var rs1_cases =  Array((Bool(false),  UInt(0,TPREG_SZ)))
+      var rs2_cases =  Array((Bool(false),  UInt(0,TPREG_SZ)))
+      var rs3_cases =  Array((Bool(false),  UInt(0,TPREG_SZ)))
+      var stale_cases= Array((Bool(false),  UInt(0,TPREG_SZ)))
 
       // Handle bypassing new virtual physical destinations to operands (and stale destination)
       // scalastyle:off

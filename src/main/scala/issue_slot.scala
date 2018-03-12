@@ -28,8 +28,8 @@ class IssueSlotIO(num_wakeup_ports: Int)(implicit p: Parameters) extends BoomBun
    val kill           = Bool(INPUT) // pipeline flush
    val clear          = Bool(INPUT) // entry being moved elsewhere (not mutually exclusive with grant)
 
-   val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width = VPREG_SZ))).flip
-   val wakeup_pdsts   = Vec(num_wakeup_ports, UInt(width = PPREG_SZ)).asInput
+   val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width = TPREG_SZ))).flip
+   val wakeup_pdsts   = Vec(num_wakeup_ports, UInt(width = TPREG_SZ)).asInput
    val wakeup_masks   = Vec(num_wakeup_ports, UInt(width = numIntPhysRegsParts)).asInput
 
    val in_uop         = Valid(new MicroOp()).flip // if valid, this WILL overwrite an entry!
@@ -170,6 +170,11 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
       next_p1 := io.in_uop.bits.rs1_mask != UInt(0) || io.in_uop.bits.lrs1_rtype === RT_X//yqh
       next_p2 := io.in_uop.bits.rs2_mask != UInt(0) || io.in_uop.bits.lrs2_rtype === RT_X
       next_p3 := io.in_uop.bits.rs3_mask != UInt(0) || !io.in_uop.bits.frs3_en
+      // yqh tmp
+      slotUop.pop1 := io.in_uop.bits.vop1
+      slotUop.pop2 := io.in_uop.bits.vop2
+      slotUop.pop3 := io.in_uop.bits.vop3
+      slotUop.pdst := io.in_uop.bits.vdst
    }
    .otherwise
    {
@@ -179,9 +184,10 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
       slotUop.rs1_mask := updated_mask1
       slotUop.rs2_mask := updated_mask2
       slotUop.rs3_mask := updated_mask3
-      slotUop.pop1 := updated_pop1
-      slotUop.pop2 := updated_pop2
-      slotUop.pop3 := updated_pop3
+      // yqh todo
+      //slotUop.pop1 := updated_pop1
+      //slotUop.pop2 := updated_pop2
+      //slotUop.pop3 := updated_pop3
    }
 
    for (i <- 0 until num_slow_wakeup_ports)
@@ -259,9 +265,10 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    io.updated_uop.rs1_mask  := updated_mask1
    io.updated_uop.rs2_mask  := updated_mask2
    io.updated_uop.rs3_mask  := updated_mask3
-   io.updated_uop.pop1      := updated_pop1
-   io.updated_uop.pop2      := updated_pop2
-   io.updated_uop.pop3      := updated_pop3
+   // yqh todo
+   //io.updated_uop.pop1      := updated_pop1
+   //io.updated_uop.pop2      := updated_pop2
+   //io.updated_uop.pop3      := updated_pop3
 
    when (slot_state === s_valid_2)
    {
