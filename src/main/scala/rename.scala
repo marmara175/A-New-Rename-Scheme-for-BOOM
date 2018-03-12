@@ -306,14 +306,14 @@ class RenameStage(
 
        when (uop.lrs1_rtype === RT_FIX) 
 	   {
-           uop.pop1 		:= i_v2p_map.prs1
+               uop.pop1 	:= i_v2p_map.prs1
 	       //uop.rs1_mask 	:= i_v2p_map.prs1_mask === UInt(0)
 	   }
 
 	   when (uop.lrs2_rtype === RT_FIX) 
 	   {
-           uop.pop2 		:= i_v2p_map.prs2
-		   //uop.rs2_mask 	:= i_v2p_map.prs2_mask === UInt(0)
+               uop.pop2 	:= i_v2p_map.prs2
+               //uop.rs2_mask 	:= i_v2p_map.prs2_mask === UInt(0)
 	   }
    }
 
@@ -384,13 +384,13 @@ class RenameStage(
       val ibusy = ibusytable.io.values(w)
       val fbusy = fbusytable.io.values(w)
 
-	  // yqh
-	  val ibusy_rs1_mask = Mux(ibusy.rs1_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-	  val ibusy_rs2_mask = Mux(ibusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
+      // yqh
+      val ibusy_rs1_mask = Mux(ibusy.rs1_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
+      val ibusy_rs2_mask = Mux(ibusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
 
-	  val fbusy_rs1_mask = Mux(fbusy.rs1_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-	  val fbusy_rs2_mask = Mux(fbusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-	  val fbusy_rs3_mask = Mux(fbusy.rs3_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
+      val fbusy_rs1_mask = Mux(fbusy.rs1_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
+      val fbusy_rs2_mask = Mux(fbusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
+      val fbusy_rs3_mask = Mux(fbusy.rs3_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
 
       uop.rs1_mask := Mux(uop.lrs1_rtype === RT_FLT, fbusy_rs1_mask, ibusy_rs1_mask)
       uop.rs2_mask := Mux(uop.lrs2_rtype === RT_FLT, fbusy_rs2_mask, ibusy_rs2_mask)

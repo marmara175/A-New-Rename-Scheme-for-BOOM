@@ -151,32 +151,58 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    val out_p2 = Wire(Bool()); out_p2 := slot_p2
    val out_p3 = Wire(Bool()); out_p3 := slot_p3
 
+   val updated_mask1	= Wire(UInt())
+   val updated_mask2 	= Wire(UInt())
+   val updated_mask3    = Wire(UInt())
+   val updated_pop1	= Wire(UInt())
+   val updated_pop2	= Wire(UInt())
+   val updated_pop3	= Wire(UInt())
+
+   updated_mask1 := slotUop.rs1_mask 
+   updated_mask2 := slotUop.rs2_mask
+   updated_mask3 := slotUop.rs3_mask
+   updated_pop1  := slotUop.pop1
+   updated_pop2  := slotUop.pop2
+   updated_pop3  := slotUop.pop3
+
    when (io.in_uop.valid)
    {
-      next_p1 := io.in_uop.bits.rs1_mask != UInt(0)	//yqh
-      next_p2 := io.in_uop.bits.rs2_mask != UInt(0)
-      next_p3 := io.in_uop.bits.rs3_mask != UInt(0)
+      next_p1 := io.in_uop.bits.rs1_mask != UInt(0) || io.in_uop.bits.lrs1_rtype === RT_X//yqh
+      next_p2 := io.in_uop.bits.rs2_mask != UInt(0) || io.in_uop.bits.lrs2_rtype === RT_X
+      next_p3 := io.in_uop.bits.rs3_mask != UInt(0) || !io.in_uop.bits.frs3_en
    }
    .otherwise
    {
       next_p1 := out_p1
       next_p2 := out_p2
       next_p3 := out_p3
+      slotUop.rs1_mask := updated_mask1
+      slotUop.rs2_mask := updated_mask2
+      slotUop.rs3_mask := updated_mask3
+      slotUop.pop1 := updated_pop1
+      slotUop.pop2 := updated_pop2
+      slotUop.pop3 := updated_pop3
    }
 
    for (i <- 0 until num_slow_wakeup_ports)
    {
-      when (io.wakeup_vdsts(i).valid && (io.wakeup_vdsts(i).bits === slotUop.vop1))
+      when (io.wakeup_vdsts(i).valid && (slotUop.rs1_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop1))
       {
-         out_p1 := Bool(true)
+         out_p1        := Bool(true)
+         updated_mask1 := io.wakeup_masks(i)
+         updated_pop1  := io.wakeup_pdsts(i)
       }
-      when (io.wakeup_vdsts(i).valid && (io.wakeup_vdsts(i).bits === slotUop.vop2))
+      when (io.wakeup_vdsts(i).valid && (slotUop.rs2_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop2))
       {
-         out_p2 := Bool(true)
+         out_p2        := Bool(true)
+         updated_mask2 := io.wakeup_masks(i)
+         updated_pop2  := io.wakeup_pdsts(i)
       }
-      when (io.wakeup_vdsts(i).valid && (io.wakeup_vdsts(i).bits === slotUop.vop3))
+      when (io.wakeup_vdsts(i).valid && (slotUop.rs3_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop3))
       {
          out_p3 := Bool(true)
+         updated_mask3 := io.wakeup_masks(i)
+         updated_pop3  := io.wakeup_pdsts(i)
       }
    }
 
@@ -230,10 +256,13 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    io.updated_uop.lrs2_rtype:= updated_lrs2_rtype
    io.updated_uop.br_mask   := out_br_mask
    // yqh
-   io.updated_uop.rs1_mask := Mux(out_p1, ~Bits(0, width = numIntPhysRegsParts), Bits(0, width = numIntPhysRegsParts))	// ???
-   io.updated_uop.rs2_mask := Mux(out_p2, ~Bits(0, width = numIntPhysRegsParts), Bits(0, width = numIntPhysRegsParts))	// ???
-   io.updated_uop.rs3_mask := Mux(out_p3, ~Bits(0, width = numIntPhysRegsParts), Bits(0, width = numIntPhysRegsParts))	// ???
- 
+   io.updated_uop.rs1_mask  := updated_mask1
+   io.updated_uop.rs2_mask  := updated_mask2
+   io.updated_uop.rs3_mask  := updated_mask3
+   io.updated_uop.pop1      := updated_pop1
+   io.updated_uop.pop2      := updated_pop2
+   io.updated_uop.pop3      := updated_pop3
+
    when (slot_state === s_valid_2)
    {
       when (slot_p1 && slot_p2)
