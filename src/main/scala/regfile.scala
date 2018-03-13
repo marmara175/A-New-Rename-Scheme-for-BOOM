@@ -28,6 +28,7 @@ class RegisterFileReadPortIO(addr_width: Int, data_width: Int)(implicit p: Param
 class RegisterFileWritePort(addr_width: Int, data_width: Int)(implicit p: Parameters) extends BoomBundle()(p)
 {
    val addr = UInt(width = addr_width)
+   val mask = UInt(width = numIntPhysRegsParts)
    val data = UInt(width = data_width)
    override def cloneType = new RegisterFileWritePort(addr_width, data_width)(p).asInstanceOf[this.type]
 }
@@ -41,7 +42,9 @@ object WritePort
    {
       val wport = Wire(Decoupled(new RegisterFileWritePort(addr_width, data_width)))
       wport.valid := enq.valid
-      wport.bits.addr := enq.bits.uop.vdst
+      wport.bits.addr := enq.bits.uop.pdst
+      //yqh
+      wport.bits.mask := enq.bits.uop.dst_mask
       wport.bits.data := enq.bits.data
       enq.ready := wport.ready
 
@@ -87,6 +90,90 @@ class RegisterFileBehavorial(
 
    val regfile = Mem(num_registers, UInt(width=register_width))
 
+   // --------------------------------------------------------------
+   // Write Merge
+
+   val valid_merged	   = Wire(Vec(num_write_ports, Bool()))
+   val addr_merged	   = Wire(Vec(num_write_ports, UInt(width = TPREG_SZ)))
+   val mask_merged	   = Wire(Vec(num_write_ports, UInt(width = numIntPhysRegsParts)))
+   val data_merged	   = Wire(Vec(num_write_ports, UInt(width = register_width)))
+   val new_data_merged = Wire(Vec(num_write_ports, UInt(width = register_width)))
+
+   def extend_mask(mask: UInt, mask_size: Int, register_width: Int): UInt =
+   {
+      val sub_width = register_width / mask_size
+	  var e_mask = 0.U
+
+	  for (i <- 0 until mask_size)
+	  {
+	     val sub_mask = ((mask(i) << 63.U).asSInt() >> 63.U)(sub_width-1,0)
+		 e_mask = e_mask | sub_mask.asUInt() << (sub_width * i)
+	  }
+
+	  e_mask.asUInt()
+   }
+
+   for (i <- 0 until num_write_ports)
+   {
+      io.write_ports(i).ready := Bool(true)
+      valid_merged(i) := io.write_ports(i).valid
+	  addr_merged(i)  := io.write_ports(i).bits.addr
+	  mask_merged(i)  := io.write_ports(i).bits.mask
+	  data_merged(i)  := io.write_ports(i).bits.data
+   }
+
+   for (i <- 0 until num_write_ports)
+   {
+      var next_mask_merged = io.write_ports(i).bits.mask
+	  var next_data_merged = io.write_ports(i).bits.data
+
+	  for (j <- i+1 until num_write_ports)
+	  {
+	     val valid_i = io.write_ports(i).valid
+		 val valid_j = io.write_ports(j).valid
+		 val addr_i  = io.write_ports(i).bits.addr
+		 val addr_j  = io.write_ports(j).bits.addr
+
+		 val updated_mask_i = Wire(init = UInt(0, width = numIntPhysRegsParts))
+		 val updated_data_i = Wire(init = UInt(0, width = register_width))
+
+		 when (valid_i && valid_j && addr_i === addr_j)
+		 {
+		    updated_mask_i  := io.write_ports(j).bits.mask
+			updated_data_i  := io.write_ports(j).bits.data
+			valid_merged(j) := false.B
+		 }
+		 next_mask_merged = next_mask_merged | updated_mask_i
+		 next_data_merged = next_data_merged | updated_data_i
+	  }
+
+	  mask_merged(i)  := next_mask_merged
+	  data_merged(i)  := next_data_merged
+   }
+
+   val merged_wport = Wire(Vec(num_write_ports, new DecoupledIO(new RegisterFileWritePort(TPREG_SZ, register_width))))
+   for (i <- 0 until num_write_ports) 
+   {
+      val valid   = valid_merged(i)
+      val addr    = addr_merged(i)
+	  val mask    = mask_merged(i)
+	  val data    = data_merged(i)
+     
+      merged_wport(i).valid     := valid
+	  merged_wport(i).bits.addr := addr
+	  merged_wport(i).bits.data := data | regfile(addr) & ~extend_mask(mask, numIntPhysRegsParts, register_width)
+   }
+
+   for (i <- 0 until num_write_ports)
+   {
+       printf("merged_wport(%d).valid = 0x%x\n", i.asUInt(), merged_wport(i).valid)
+	   printf("merged_wport(%d).bits.addr = 0x%x\n", i.asUInt(), merged_wport(i).bits.addr)
+	   printf("merged_wport(%d).bits.data = 0x%x\n", i.asUInt(), merged_wport(i).bits.data)
+	   printf("write_ports(%d).valid = 0x%x\n", i.asUInt(), io.write_ports(i).valid)
+	   printf("write_ports(%d).bits.addr = 0x%x\n", i.asUInt(), io.write_ports(i).bits.addr)
+	   printf("write_ports(%d).bits.data = 0x%x\n", i.asUInt(), io.write_ports(i).bits.data)
+	   printf("write_ports(%d).bits.mask = 0x%x\n", i.asUInt(), io.write_ports(i).bits.mask)
+   }
 
    // --------------------------------------------------------------
    // Read ports.
@@ -109,8 +196,28 @@ class RegisterFileBehavorial(
             UInt(0),
             regfile(read_addrs(i)))
    }
+   
+   
+   for (i <- 0 until num_read_ports)
+   {
+      val bypass_ens = merged_wport.map(x => x.valid && x.bits.addr =/= UInt(0) && x.bits.addr === read_addrs(i)) 
 
+      val bypass_data = Mux1H(Vec(bypass_ens), Vec(merged_wport.map(_.bits.data)))
 
+      io.read_ports(i).data := Mux(bypass_ens.reduce(_|_), bypass_data, read_data(i))
+   }
+  
+   // --------------------------------------------------------------
+   // Write ports.
+   for (wport <- merged_wport)
+   {
+      when (wport.valid && (wport.bits.addr =/= UInt(0)))
+	  {
+	     regfile(wport.bits.addr) := wport.bits.data
+	  }
+   }
+   
+   /*
    // --------------------------------------------------------------
    // Bypass out of the ALU's write ports.
    // We are assuming we cannot bypass a writer to a reader within the regfile memory
@@ -156,4 +263,5 @@ class RegisterFileBehavorial(
          regfile(wport.bits.addr) := wport.bits.data
       }
    }
+   */
 }

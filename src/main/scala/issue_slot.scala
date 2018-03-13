@@ -174,7 +174,9 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
       slotUop.pop1 := io.in_uop.bits.vop1
       slotUop.pop2 := io.in_uop.bits.vop2
       slotUop.pop3 := io.in_uop.bits.vop3
+
       slotUop.pdst := io.in_uop.bits.vdst
+      slotUop.dst_mask := ~Bits(0, width = numIntPhysRegsParts)
    }
    .otherwise
    {

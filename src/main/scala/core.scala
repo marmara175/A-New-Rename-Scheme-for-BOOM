@@ -743,7 +743,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          val wbresp = exe_units(i).io.resp(j)
          //yqh
          val wbpdst = wbresp.bits.uop.pdst
-         //val wbvdst = wbresp.bits.uop.vdst
+         val wbmask = wbresp.bits.uop.dst_mask
          val wbdata = wbresp.bits.data
 
          def wbIsValid(rtype: UInt) =
@@ -761,7 +761,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
             iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
-            //iregfile.io.write_ports(w_cnt).bits.addr := wbvdst
+            iregfile.io.write_ports(w_cnt).bits.mask := wbmask 
             iregfile.io.write_ports(w_cnt).bits.data := Mux(wbReadsCSR, csr.io.rw.rdata, wbdata)
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
          }
@@ -781,7 +781,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
             iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
-            //iregfile.io.write_ports(w_cnt).bits.addr := wbvdst
+            iregfile.io.write_ports(w_cnt).bits.mask := wbmask
             iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
          }

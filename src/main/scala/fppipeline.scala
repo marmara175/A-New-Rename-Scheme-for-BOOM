@@ -253,8 +253,8 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             fregfile.io.write_ports(w_cnt).valid :=
                wbresp.valid &&
                wbresp.bits.uop.ctrl.rf_wen
-            //fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.vdst
             fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.pdst
+            fregfile.io.write_ports(w_cnt).bits.mask := wbresp.bits.uop.dst_mask
             fregfile.io.write_ports(w_cnt).bits.data := wbresp.bits.data
             wbresp.ready := fregfile.io.write_ports(w_cnt).ready
          }
