@@ -133,10 +133,10 @@ class ALUExeUnit(
    extends ExecutionUnit(
       num_rf_read_ports = if (has_fpu) 3 else 2,
       num_rf_write_ports = 1,
-      num_bypass_stages =
-         (if (has_fpu && has_alu) p(tile.TileKey).core.fpu.get.dfmaLatency
-         else if (has_alu && has_mul && !use_slow_mul) p(BoomKey).imulLatency
-         else if (has_alu) 1 else 0),
+	  num_bypass_stages =
+         (if (has_fpu && has_alu) (p(tile.TileKey).core.fpu.get.dfmaLatency + 1)
+         else if (has_alu && has_mul && !use_slow_mul) (p(BoomKey).imulLatency + 1)
+         else if (has_alu) 2 else 0),
       data_width = if (has_fpu || has_fdiv) 65 else 64,
       bypassable = has_alu,
       is_mem_unit = false,
@@ -181,7 +181,12 @@ class ALUExeUnit(
    var alu: ALUUnit = null
    if (has_alu)
    {
-      alu = Module(new ALUUnit(is_branch_unit = is_branch_unit, num_stages = num_bypass_stages))
+      val num_stages = 
+         (if (has_fpu && has_alu) p(tile.TileKey).core.fpu.get.dfmaLatency
+         else if (has_alu && has_mul && !use_slow_mul) p(BoomKey).imulLatency
+         else if (has_alu) 1 else 0)
+
+      alu = Module(new ALUUnit(is_branch_unit = is_branch_unit, num_stages = num_stages, num_bypass_stages = num_bypass_stages))
       alu.io.req.valid         := io.req.valid &&
                                       (io.req.bits.uop.fu_code === FU_ALU ||
                                        io.req.bits.uop.fu_code === FU_BRU ||
@@ -588,7 +593,7 @@ class ALUMemExeUnit(
    extends ExecutionUnit(
       num_rf_read_ports = if (has_fpu) 3 else 2,
       num_rf_write_ports = 2,
-      num_bypass_stages = if (has_fpu) p(tile.TileKey).core.fpu.get.dfmaLatency else if (has_mul && !use_slow_mul) 3 else 1,
+      num_bypass_stages = (if (has_fpu) (p(tile.TileKey).core.fpu.get.dfmaLatency + 1) else if (has_mul && !use_slow_mul) 4 else 2),
       data_width = if (fp_mem_support) 65 else 64,
       num_variable_write_ports = 1,
       bypassable = true,
@@ -629,7 +634,9 @@ class ALUMemExeUnit(
 
 
    // ALU Unit -------------------------------
-   val alu = Module(new ALUUnit(is_branch_unit = is_branch_unit, num_stages = num_bypass_stages))
+   val num_stages = if (has_fpu) p(tile.TileKey).core.fpu.get.dfmaLatency else if (has_mul && !use_slow_mul) 3 else 1
+
+   val alu = Module(new ALUUnit(is_branch_unit = is_branch_unit, num_stages = num_stages, num_bypass_stages = num_bypass_stages))
    alu.io.req.valid         := io.req.valid &&
                                     (io.req.bits.uop.fu_code_is(FU_ALU) ||
                                      io.req.bits.uop.fu_code_is(FU_BRU) ||

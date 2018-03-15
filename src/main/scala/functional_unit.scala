@@ -244,9 +244,9 @@ abstract class PipelinedFunctionalUnit(val num_stages: Int,
 
 }
 
-class ALUUnit(is_branch_unit: Boolean = false, num_stages: Int = 1)(implicit p: Parameters)
+class ALUUnit(is_branch_unit: Boolean = false, num_stages: Int = 1, num_bypass_stages:Int = 1)(implicit p: Parameters)
              extends PipelinedFunctionalUnit(num_stages = num_stages
-                                            , num_bypass_stages = num_stages
+                                            , num_bypass_stages = num_bypass_stages
                                             , earliest_bypass_stage = 0
                                             , data_width = 64  //xLen
                                             , is_branch_unit = is_branch_unit)(p)
@@ -584,7 +584,7 @@ class ALUUnit(is_branch_unit: Boolean = false, num_stages: Int = 1)(implicit p: 
    require (num_bypass_stages >= 1)
    io.bypass.valid(0) := io.req.valid
    io.bypass.data (0) := alu.io.out
-   for (i <- 1 until num_stages)
+   for (i <- 1 until num_bypass_stages)
    {
       io.bypass.valid(i) := r_val(i-1)
       io.bypass.data (i) := r_data(i-1)
