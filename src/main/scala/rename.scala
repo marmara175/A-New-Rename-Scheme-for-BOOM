@@ -22,6 +22,20 @@ package boom
 import Chisel._
 import config.Parameters
 
+class AllocToRenameIO(
+   vreg_sz: Int,
+   preg_sz: Int,
+   mask_sz: Int) extends Bundle
+{
+   val valid     = Bool(INPUT)
+   val vreg      = UInt(INPUT, width=vreg_sz)
+   val nums      = UInt(INPUT, width=mask_sz)
+   val can_alloc = Bool(OUTPUT)
+   val preg      = UInt(OUTPUT, width=preg_sz)
+   val mask      = UInt(OUTPUT, width=mask_sz)
+
+   override def cloneType: this.type = new AllocToRenameIO(vreg_sz,preg_sz,mask_sz).asInstanceOf[this.type]
+}
 
 class RenameStageIO(
    pl_width: Int,
@@ -31,8 +45,8 @@ class RenameStageIO(
    num_fp_wb_ports: Int)
    (implicit p: Parameters) extends BoomBundle()(p)
 {
-   private val int_preg_sz = log2Up(num_int_pregs)
-   private val fp_preg_sz = log2Up(num_fp_pregs)
+   private val int_preg_sz = TPREG_SZ
+   private val fp_preg_sz = TPREG_SZ
 
    val inst_can_proceed = Vec(pl_width, Bool()).asOutput
 
@@ -56,6 +70,10 @@ class RenameStageIO(
    val get_pred  = new GetPredictionInfo().flip
 
    val dis_inst_can_proceed = Vec(DISPATCH_WIDTH, Bool()).asInput
+
+   // alloc physical register stage, yqh
+   val int_alloc_pregs = Vec(num_int_wb_ports, new AllocToRenameIO(TPREG_SZ, TPREG_SZ, numIntPhysRegsParts))
+   val fp_alloc_pregs  = Vec(num_fp_wb_ports, new AllocToRenameIO(TPREG_SZ, TPREG_SZ, numIntPhysRegsParts))
 
    // issue stage (fast wakeup)
    val int_wakeups = Vec(num_int_wb_ports, Valid(new ExeUnitResp(xLen))).flip
@@ -109,9 +127,9 @@ class RenameStage(
        numIntVPhysRegs,
        numIntPPhysRegs,
        pl_width*2,
-       num_wb_ports = pl_width))
+       num_int_wb_ports))
    val i_pfreelist = Module(new RenamePFreeList(
-       num_write_ports = pl_width,
+       num_int_wb_ports,
 	   pl_width,
 	   RT_FIX.litValue,
 	   numIntPPhysRegs))
@@ -293,10 +311,10 @@ class RenameStage(
    i_v2p_maptable.io.com_uops		:= io.com_uops
    i_v2p_maptable.io.com_rbk_valids	:= io.com_rbk_valids
 
-   for (w <- 0 until pl_width)
+   for (w <- 0 until num_int_wb_ports)
    { 
        i_v2p_maptable.io.allocpregs_valids(w)	:= i_pfreelist.io.can_allocate(w)
-       i_v2p_maptable.io.allocpregs_vregs(w)	:= ren2_uops(w).vdst // ??? 
+       i_v2p_maptable.io.allocpregs_vregs(w)	:= io.int_alloc_pregs(w).vreg
        i_v2p_maptable.io.allocpregs_pregs(w)	:= i_pfreelist.io.req_pregs(w)
        i_v2p_maptable.io.allocpregs_masks(w)	:= i_pfreelist.io.req_masks(w)
    }
@@ -324,16 +342,16 @@ class RenameStage(
    i_pfreelist.io.brinfo := io.brinfo
 
    for (w <- 0 until pl_width) {
-	   i_pfreelist.io.ren_uops(w)       	:= ren2_uops(w)
-       i_pfreelist.io.ren_br_vals(w) 		:= ren2_will_fire(w) & ren2_uops(w).allocate_brtag
+       i_pfreelist.io.ren_uops(w)           := ren2_uops(w)
+       i_pfreelist.io.ren_br_vals(w)        := ren2_will_fire(w) & ren2_uops(w).allocate_brtag
+   }
 
-	   //???
-       i_pfreelist.io.req_preg_vals(w)     	:= !io.kill &&                        
-                                               ren2_will_fire(w) &&
-                                               ren2_uops(w).ldst_val &&
-                                               ren2_uops(w).dst_rtype === RT_FIX
-
-       i_pfreelist.io.req_part_nums(w) 		:= Wire(init = UInt(numIntPhysRegsParts))
+   for (w <- 0 until num_int_wb_ports) {
+       i_pfreelist.io.req_preg_vals(w)      := io.int_alloc_pregs(w).valid
+       i_pfreelist.io.req_part_nums(w)      := io.int_alloc_pregs(w).nums
+       io.int_alloc_pregs(w).can_alloc      := i_pfreelist.io.can_allocate(w)
+       io.int_alloc_pregs(w).preg           := i_pfreelist.io.req_pregs(w)
+       io.int_alloc_pregs(w).mask           := i_pfreelist.io.req_masks(w)
    }
 
    i_pfreelist.io.enq_vals 			:= i_v2p_maptable.io.enq_valids 

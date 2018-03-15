@@ -263,7 +263,7 @@ class RenamePFreeList(
     num_physical_registers: Int)// number of physical registers
     (implicit p: Parameters) extends BoomModule()(p)
 {
-    private val preg_sz = log2Up(num_physical_registers)
+    private val preg_sz = TPREG_SZ
 	private val part_num_sz= log2Up(numIntPhysRegsParts)
 
     val io = new Bundle

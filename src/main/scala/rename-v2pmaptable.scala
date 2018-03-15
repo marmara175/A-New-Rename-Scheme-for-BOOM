@@ -18,8 +18,8 @@ class V2PMapTableIo(
     mask_sz: Int)
     (implicit p: Parameters) extends BoomBundle()(p)
 {
-    private val preg_sz = log2Up(num_pregs)
-    private val vreg_sz = log2Up(num_vregs)
+    private val preg_sz = TPREG_SZ
+    private val vreg_sz = TPREG_SZ
 
     val v_rs		= Vec(num_read_ports, UInt(width=vreg_sz)).asInput
     val p_rs		= Vec(num_read_ports, UInt(width=preg_sz)).asOutput
@@ -56,8 +56,8 @@ class V2PMapTableHelper(
     mask_sz: Int)
     (implicit p: Parameters) extends BoomModule()(p)
 {
-    private val preg_sz = log2Up(num_pregs)
-    private val vreg_sz = log2Up(num_vregs)
+    private val preg_sz = TPREG_SZ
+    private val vreg_sz = TPREG_SZ
 
     val io = new V2PMapTableIo(pipeline_width, num_vregs, num_pregs, num_read_ports, num_wb_ports, mask_sz)
 
@@ -173,8 +173,8 @@ class RenameV2PMapTable(
     )(implicit p: Parameters) extends BoomModule()(p)
     with HasBoomCoreParameters
 {
-    private val vreg_sz = log2Up(num_virtual_registers)
-    private val preg_sz = log2Up(num_physical_registers)
+    private val vreg_sz = TPREG_SZ
+    private val preg_sz = TPREG_SZ
 	private val mask_sz = numIntPhysRegsParts 
 
     val io = new BoomBundle()(p)
@@ -244,9 +244,6 @@ class RenameV2PMapTable(
 							io.ren_uops(w).dst_rtype === UInt(rtype)
 		v2p_maptable.io.allocated_vdst(w).bits := io.ren_uops(w).vdst//保证ren1就对ren_uops(w).vdst赋值
     }
-
-	// ???
-	// 确认0号虚拟寄存器正确映射到0号物理寄存器
 
     v2p_maptable.io.allocpregs_valids := io.allocpregs_valids //???
     v2p_maptable.io.allocpregs_vregs := io.allocpregs_vregs
