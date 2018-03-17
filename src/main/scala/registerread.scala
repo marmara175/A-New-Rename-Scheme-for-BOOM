@@ -46,7 +46,6 @@ class RegisterReadIO(
    )(p).asInstanceOf[this.type]
 }
 
-
 class RegisterRead(
    issue_width: Int,
    supported_units_array: Seq[SupportedFuncUnits],
@@ -70,6 +69,53 @@ class RegisterRead(
    val exe_reg_rs2_data = Reg(Vec(issue_width, Bits(width = register_width)))
    val exe_reg_rs3_data = Reg(Vec(issue_width, Bits(width = register_width)))
 
+
+   // mask === all(1) : 读出整个寄存器
+   // masl =/= all(1) : 读出对应子块、拼接、符号扩展成reg_width宽度
+   def MyDecode(reg_data: UInt, reg_width: Int, mask: UInt, mask_width: Int): UInt =
+   {
+     val output      = Wire(init = UInt(0, reg_width.W))
+   
+     val this_data   = Wire(UInt(reg_width.W))
+     this_data       := reg_data
+   
+     var res         = UInt(0, reg_width.W)
+     var cnt         = UInt(0, mask_width.W)
+
+     for (i <- 3 to 0 by -1)
+     {
+   	    val sub_res = Wire(init = UInt(0, 16.W))
+   	    val shift   = Wire(init = UInt(0, 5.W))
+   	    val asc     = Wire(init = UInt(0, 1.W))
+   	    when(mask(i) === true.B)
+   	    {
+   	       sub_res := this_data(((i+1)<<4)-1, i<<4)
+   	       shift   := 16.U
+   	       asc     := 1.U
+   	    }
+   	    cnt = cnt + asc
+   	    res = (res << shift) | sub_res
+     }
+
+     val size = cnt << 4
+     val sign = res((size - 1.U) & "b111111".U).toBool
+     val ext1 = (1.U << (reg_width.asUInt() - size)) - 1.U
+     
+     when (mask === ~0.U(mask_width.W) || mask === 0.U(mask_width.W))
+     {
+        output := reg_data
+     }
+	 .elsewhen (sign)
+	 {
+	    output := (ext1 << size) | res
+	 }
+	 .otherwise
+	 {
+        output := res
+	 }
+   
+     output
+   }
 
    //-------------------------------------------------------------
    // hook up inputs
@@ -119,21 +165,9 @@ class RegisterRead(
       val rs3_addr = io.iss_uops(w).pop3
       val rs3_mask = io.iss_uops(w).rs3_mask
 
-      if (num_read_ports > 0)
-      {
-         io.rf_read_ports(idx+0).addr := rs1_addr
-         io.rf_read_ports(idx+0).mask := rs1_mask
-      }
-      if (num_read_ports > 1)
-      {
-         io.rf_read_ports(idx+1).addr := rs2_addr
-         io.rf_read_ports(idx+1).mask := rs2_mask
-      }
-      if (num_read_ports > 2)
-      {
-         io.rf_read_ports(idx+2).addr := rs3_addr
-         io.rf_read_ports(idx+2).mask := rs3_mask
-      }
+      if (num_read_ports > 0)	io.rf_read_ports(idx+0).addr := rs1_addr
+      if (num_read_ports > 1)	io.rf_read_ports(idx+1).addr := rs2_addr
+      if (num_read_ports > 2)	io.rf_read_ports(idx+2).addr := rs3_addr
 
       if (num_read_ports > 0) rrd_rs1_data(w) := io.rf_read_ports(idx+0).data
       if (num_read_ports > 1) rrd_rs2_data(w) := io.rf_read_ports(idx+1).data
@@ -229,8 +263,15 @@ class RegisterRead(
 
       io.exe_reqs(w).valid    := exe_reg_valids(w)
       io.exe_reqs(w).bits.uop := exe_reg_uops(w)
-      if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := exe_reg_rs1_data(w)
-      if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := exe_reg_rs2_data(w)
-      if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := exe_reg_rs3_data(w)
+      //if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := exe_reg_rs1_data(w)
+      //if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := exe_reg_rs2_data(w)
+      //if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := exe_reg_rs3_data(w)
+
+	  val rs1_data_decoded = MyDecode(exe_reg_rs1_data(w), register_width, exe_reg_uops(w).rs1_mask, numIntPhysRegsParts) 
+      val rs2_data_decoded = MyDecode(exe_reg_rs2_data(w), register_width, exe_reg_uops(w).rs2_mask, numIntPhysRegsParts)
+	  val rs3_data_decoded = MyDecode(exe_reg_rs3_data(w), register_width, exe_reg_uops(w).rs3_mask, numIntPhysRegsParts)
+	  if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := rs1_data_decoded
+      if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := rs2_data_decoded
+      if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := rs3_data_decoded
    }
 }

@@ -64,11 +64,6 @@ class V2PMapTableHelper(
     val v2p_maptable_pregs = Reg(init = Vec.fill(num_vregs) {UInt(0, preg_sz)})
     val v2p_maptable_masks = Reg(init = Vec.fill(num_vregs) {UInt(0, mask_sz)})
 
-	//0号逻辑寄存器映射到0号物理寄存器
-	//0号物理寄存器不能被分配，值为0
-    v2p_maptable_pregs(0) := UInt(0, width = preg_sz)
-	v2p_maptable_masks(0) := ~UInt(0, width = mask_sz)
-
     for (idx <- 0 until pipeline_width)
     {
         when (io.allocated_vdst(idx).valid)
@@ -145,6 +140,11 @@ class V2PMapTableHelper(
 		io.rollback_pdsts(ridx)	:= v2p_maptable_pregs(rollback_vreg)
 		io.rollback_pdsts(ridx)	:= v2p_maptable_masks(rollback_vreg)
 	}
+
+	//0号逻辑寄存器映射到0号物理寄存器
+	//0号物理寄存器不能被分配，值为0
+    v2p_maptable_pregs(0) := UInt(0, width = preg_sz)
+	v2p_maptable_masks(0) := ~UInt(0, width = mask_sz)
 
 }
 

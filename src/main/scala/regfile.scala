@@ -21,7 +21,6 @@ import scala.collection.mutable.ArrayBuffer
 class RegisterFileReadPortIO(addr_width: Int, data_width: Int)(implicit p: Parameters) extends BoomBundle()(p)
 {
    val addr = UInt(INPUT, addr_width)
-   val mask = UInt(INPUT, numIntPhysRegsParts)
    val data = UInt(OUTPUT, data_width)
    override def cloneType = new RegisterFileReadPortIO(addr_width, data_width)(p).asInstanceOf[this.type]
 }
@@ -125,58 +124,6 @@ class RegisterFileBehavorial(
 	  output
    }
 
-   // mask === all(1) : 读出整个寄存器
-   // masl =/= all(1) : 读出对应子块、拼接、符号扩展成reg_width宽度
-   def MyDecode(reg_data: UInt, reg_width: Int, mask: UInt, mask_width: Int): UInt =
-   {
-	  val output      = Wire(init = UInt(0, reg_width.W))
-	  val sub_width   = reg_width / mask_width
-	  val sub_mask    = (1.U << sub_width) - 1.U
-
-	  val this_mask   = Wire(UInt(mask_width.W))
-	  val this_data   = Wire(UInt(reg_width.W))
-	  this_mask       := mask
-	  this_data       := reg_data
-
-	  var res         = UInt(0, reg_width.W)
-	  var cnt         = UInt(0, mask_width.W)
-	  for (i <- mask_width-1 to 0 by -1)
-	  {
-	     val offset  = sub_width * i
-		 val sub_res = Wire(init = UInt(0, width = sub_width))
-		 val shift   = Wire(init = UInt(0, width = sub_width))
-		 val asc     = Wire(init = UInt(0, 1.W))
-
-		 when(this_mask(i))
-		 {
-		    sub_res := (this_data >> offset) & sub_mask
-			shift   := sub_width.asUInt()
-			asc     := 1.U
-		 }
-
-		 cnt = cnt + asc
-		 res = (res << shift) | sub_res
-	  }
-
-	  val size = sub_width.asUInt() * cnt
-	  val sign = res((size - 1.U) & "b111111".U).toBool
-	  val ext1 = (1.U << (reg_width.asUInt() - size)) - 1.U
-
-	  when (sign)
-	  {
-	     output := (ext1 << size) | res
-	  }.otherwise{
-	     output := res
-	  }
- 
-	  when (mask === ~0.U(mask_width.W))
-	  {
-	     output := reg_data
-	  }
-
-	  output
-   }
-
    for (i <- 0 until num_write_ports)
    {
       io.write_ports(i).ready := Bool(true)
@@ -254,13 +201,7 @@ class RegisterFileBehavorial(
    {
       val bypass_ens = merged_wport.map(x => x.valid && x.bits.addr =/= UInt(0) && x.bits.addr === read_addrs(i)) 
       val bypass_data = Mux1H(Vec(bypass_ens), Vec(merged_wport.map(_.bits.data)))
-      val pre_data = Mux(bypass_ens.reduce(_|_), bypass_data, read_data(i))
-      //val mask = io.read_ports(i).mask
-
-      io.read_ports(i).data := MyDecode(pre_data, register_width, ~Bits(0, numIntPhysRegsParts), numIntPhysRegsParts)
-
-      //printf ("pre_data = 0x%x, register_width = %d, read_mask = b%b, mask_size = %d, output_data = 0x%x\n",
-	  //        pre_data, register_width.asUInt(), mask, numIntPhysRegsParts.asUInt(), io.read_ports(i).data)
+      io.read_ports(i).data := Mux(bypass_ens.reduce(_|_), bypass_data, read_data(i))
    }
   
    // --------------------------------------------------------------

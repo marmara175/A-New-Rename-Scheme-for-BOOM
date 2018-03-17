@@ -42,7 +42,7 @@ class RenameStageIO(
    num_int_pregs: Int,
    num_fp_pregs: Int,
    num_int_wb_ports: Int,
-   num_fp_wb_ports: Int)
+   num_fp_wb_ports: Int,
    (implicit p: Parameters) extends BoomBundle()(p)
 {
    private val int_preg_sz = TPREG_SZ
@@ -149,6 +149,18 @@ class RenameStage(
       pl_width,
       RT_FLT.litValue,
       numFpVPhysRegs))
+   val f_v2p_maptable = Module(new RenameV2PMapTable(
+       pl_width,
+       RT_FLT.litValue,
+       numFpVPhysRegs,
+       numFpPPhysRegs,
+       pl_width*3,
+       num_fp_wb_ports))
+   val f_pfreelist = Module(new RenamePFreeList(
+       num_fp_wb_ports,
+	   pl_width,
+	   RT_FLT.litValue,
+	   numFpPPhysRegs))
    val fbusytable = Module(new BusyTable(
       pl_width,
       RT_FLT.litValue,
@@ -261,7 +273,6 @@ class RenameStage(
       else io.dis_inst_can_proceed.reduce(_&_)
 
 
-
    val ren2_imapvalues = if (renameLatency == 2) RegEnable(i_l2v_maptable.io.values, ren2_will_proceed)
                          else i_l2v_maptable.io.values
    val ren2_fmapvalues = if (renameLatency == 2) RegEnable(f_l2v_maptable.io.values, ren2_will_proceed)
@@ -303,6 +314,7 @@ class RenameStage(
    //-------------------------------------------------------------
    // V2P MapTable by yqh
 
+   // i_v2p_maptable
    i_v2p_maptable.io.ren_will_fire 	:= ren2_will_fire
    i_v2p_maptable.io.ren_uops 		:= ren2_uops
    i_v2p_maptable.io.map_table 		:= ren2_imapvalues
@@ -319,27 +331,39 @@ class RenameStage(
        i_v2p_maptable.io.allocpregs_masks(w)	:= i_pfreelist.io.req_masks(w)
    }
 
+   // f_v2p_maptable
+   f_v2p_maptable.io.ren_will_fire 	:= ren2_will_fire
+   f_v2p_maptable.io.ren_uops 		:= ren2_uops
+   f_v2p_maptable.io.map_table 		:= ren2_fmapvalues
+
+   f_v2p_maptable.io.com_valids		:= io.com_valids
+   f_v2p_maptable.io.com_uops		:= io.com_uops
+   f_v2p_maptable.io.com_rbk_valids	:= io.com_rbk_valids
+   
+   for (w <- 0 until num_fp_wb_ports)
+   { 
+       f_v2p_maptable.io.allocpregs_valids(w)	:= f_pfreelist.io.can_allocate(w)
+       f_v2p_maptable.io.allocpregs_vregs(w)	:= io.fp_alloc_pregs(w).vreg
+       f_v2p_maptable.io.allocpregs_pregs(w)	:= f_pfreelist.io.req_pregs(w)
+       f_v2p_maptable.io.allocpregs_masks(w)	:= f_pfreelist.io.req_masks(w)
+   }
+
    for ((uop, w) <- ren2_uops.zipWithIndex) {
-       val i_v2p_map = i_v2p_maptable.io.values(w)
+       val imap = i_v2p_maptable.io.values(w)
+	   val fmap = f_v2p_maptable.io.values(w)
 
-       when (uop.lrs1_rtype === RT_FIX) 
-	   {
-               uop.pop1 	:= i_v2p_map.prs1
-	       //uop.rs1_mask 	:= i_v2p_map.prs1_mask === UInt(0)
-	   }
+       uop.pop1      := Mux(uop.lrs1_rtype === RT_FLT, fmap.prs1, imap.prs1)
+       uop.pop2      := Mux(uop.lrs2_rtype === RT_FLT, fmap.prs2, imap.prs2)
+       uop.pop3      := f_v2p_maptable.io.values(w).prs3 // only FP has 3rd operand
 
-	   when (uop.lrs2_rtype === RT_FIX) 
-	   {
-               uop.pop2 	:= i_v2p_map.prs2
-               //uop.rs2_mask 	:= i_v2p_map.prs2_mask === UInt(0)
-	   }
+	   uop.rs1_mask  := Mux(uop.lrs1_rtype === RT_FLT, fmap.prs1_mask, imap.prs1_mask)
+	   uop.rs2_mask  := Mux(uop.lrs1_rtype === RT_FLT, fmap.prs2_mask, imap.prs2_mask)
+	   uop.rs3_mask  := f_v2p_maptable.io.values(w).prs3_mask
    }
 
    //-------------------------------------------------------------
    // Physical Register FreeList
    // i_pfreelist
-
-   i_pfreelist.io.brinfo := io.brinfo
 
    for (w <- 0 until pl_width) {
        i_pfreelist.io.ren_uops(w)           := ren2_uops(w)
@@ -354,6 +378,7 @@ class RenameStage(
        io.int_alloc_pregs(w).mask           := i_pfreelist.io.req_masks(w)
    }
 
+   i_pfreelist.io.brinfo 			:= io.brinfo
    i_pfreelist.io.enq_vals 			:= i_v2p_maptable.io.enq_valids 
    i_pfreelist.io.enq_pregs 		:= i_v2p_maptable.io.enq_pregs
    i_pfreelist.io.enq_masks 		:= i_v2p_maptable.io.enq_masks
@@ -361,6 +386,30 @@ class RenameStage(
    i_pfreelist.io.rollback_wens 	:= i_v2p_maptable.io.rollback_valids 
    i_pfreelist.io.rollback_pdsts 	:= i_v2p_maptable.io.rollback_pdsts
    i_pfreelist.io.rollback_masks 	:= i_v2p_maptable.io.rollback_masks
+
+   // f_pfreelist
+
+   for (w <- 0 until pl_width) {
+       f_pfreelist.io.ren_uops(w)           := ren2_uops(w)
+       f_pfreelist.io.ren_br_vals(w)        := ren2_will_fire(w) & ren2_uops(w).allocate_brtag
+   }
+
+   for (w <- 0 until num_fp_wb_ports) {
+       f_pfreelist.io.req_preg_vals(w)      := io.fp_alloc_pregs(w).valid
+       f_pfreelist.io.req_part_nums(w)      := io.fp_alloc_pregs(w).nums
+       io.fp_alloc_pregs(w).can_alloc       := f_pfreelist.io.can_allocate(w)
+       io.fp_alloc_pregs(w).preg            := f_pfreelist.io.req_pregs(w)
+       io.fp_alloc_pregs(w).mask            := f_pfreelist.io.req_masks(w)
+   }
+
+   f_pfreelist.io.brinfo 			:= io.brinfo
+   f_pfreelist.io.enq_vals 			:= f_v2p_maptable.io.enq_valids 
+   f_pfreelist.io.enq_pregs 		:= f_v2p_maptable.io.enq_pregs
+   f_pfreelist.io.enq_masks 		:= f_v2p_maptable.io.enq_masks
+
+   f_pfreelist.io.rollback_wens 	:= f_v2p_maptable.io.rollback_valids 
+   f_pfreelist.io.rollback_pdsts 	:= f_v2p_maptable.io.rollback_pdsts
+   f_pfreelist.io.rollback_masks 	:= f_v2p_maptable.io.rollback_masks
 
    //-------------------------------------------------------------
    // Busy Table
