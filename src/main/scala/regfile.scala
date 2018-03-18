@@ -42,7 +42,7 @@ object WritePort
    {
       val wport = Wire(Decoupled(new RegisterFileWritePort(addr_width, data_width)))
       wport.valid := enq.valid
-      wport.bits.addr := enq.bits.uop.pdst
+      wport.bits.addr := enq.bits.uop.vdst
       //yqh
       wport.bits.mask := enq.bits.uop.dst_mask
       wport.bits.data := enq.bits.data

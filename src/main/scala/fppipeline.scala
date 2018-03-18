@@ -47,6 +47,8 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       val wb_valids        = Vec(num_wakeup_ports, Bool()).asInput
       val wb_vdsts         = Vec(num_wakeup_ports, UInt(width=fp_vreg_sz)).asInput
 
+      val fp_alloc_pregs   = Vec(num_wakeup_ports, new AllocToRenameIO(TPREG_SZ, TPREG_SZ, numIntPhysRegsParts)).flip
+
       //TODO -- hook up commit log stuff.
       val debug_tsc_reg    = UInt(INPUT, xLen)
    }
@@ -73,6 +75,12 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
                            exe_units.withFilter(_.uses_iss_unit).map(_.num_rf_read_ports),
                            exe_units.num_total_bypass_ports,
                            fLen+1))
+
+   val ll_wbarb = Module(new Arbiter(new ExeUnitResp(fLen+1), 2))
+
+   val can_alloc  = Wire(Vec(num_wakeup_ports, Bool()))
+   val alloc_pdst = Wire(Vec(num_wakeup_ports, UInt(width=TPREG_SZ)))
+   val alloc_mask = Wire(Vec(num_wakeup_ports, UInt(width=numIntPhysRegsParts)))
 
    require (exe_units.withFilter(_.uses_iss_unit).map(x=>x).length == issue_unit.issue_width)
 
@@ -123,6 +131,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    }
    io.dis_readys := issue_unit.io.dis_readys
 
+
    //-------------------------------------------------------------
    // **** Issue Stage ****
    //-------------------------------------------------------------
@@ -151,9 +160,11 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       issue_wakeup.bits  := writeback.bits.uop.vdst
    }
 
+   var my_idx = 0
    for ( (pdst, mask) <- issue_unit.io.wakeup_pdsts zip issue_unit.io.wakeup_masks) {
-      pdst     := UInt(0)
-      mask     := ~Bits(0, width = numIntPhysRegsParts)
+      pdst     := alloc_pdst(my_idx) 
+      mask     := alloc_mask(my_idx)
+	  my_idx += 1
    }
 
    //-------------------------------------------------------------
@@ -203,10 +214,42 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    exe_units.ifpu_unit.io.req <> io.fromint
 
    //-------------------------------------------------------------
+   // **** Alloc Pregs ********
+   //-------------------------------------------------------------
+
+   io.fp_alloc_pregs(0).valid := ll_wbarb.io.out.valid
+   io.fp_alloc_pregs(0).vreg  := ll_wbarb.io.out.bits.uop.vdst
+   io.fp_alloc_pregs(0).nums  := 4.U
+   can_alloc(0) := io.fp_alloc_pregs(0).can_alloc
+   alloc_pdst(0):= io.fp_alloc_pregs(0).preg
+   alloc_mask(0):= io.fp_alloc_pregs(0).mask
+   //require( !ll_wbarb.io.out.fire() || can_alloc(0))
+
+   var al_idx = 1
+   for (eu <- exe_units)
+   {
+      for (wbresp <- eu.io.resp)
+	  {
+	     if (!wbresp.bits.writesToIRF && !eu.has_ifpu) {
+            io.fp_alloc_pregs(al_idx).valid :=
+               wbresp.valid &&
+               wbresp.bits.uop.ctrl.rf_wen
+            io.fp_alloc_pregs(al_idx).vreg := wbresp.bits.uop.vdst
+            io.fp_alloc_pregs(al_idx).nums := 4.U
+
+			can_alloc(al_idx) := io.fp_alloc_pregs(al_idx).can_alloc 
+			alloc_pdst(al_idx):= io.fp_alloc_pregs(al_idx).preg
+			alloc_mask(al_idx):= io.fp_alloc_pregs(al_idx).mask
+			//require(!(wbresp.valid && wbresp.bits.uop.ctrl.rf_wen) || can_alloc(al_idx))
+			al_idx += 1
+		 }
+	  }
+   }
+
+   //-------------------------------------------------------------
    // **** Writeback Stage ****
    //-------------------------------------------------------------
 
-   val ll_wbarb = Module(new Arbiter(new ExeUnitResp(fLen+1), 2))
    val ifpu_resp = exe_units.ifpu_unit.io.resp(0)
 
    // Hookup load writeback -- and recode FP values.
@@ -225,13 +268,14 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       // but Issue happens on S1 and RegRead doesn't happen until S2 so we're safe.
       // (for regreadlatency >0).
       fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), TPREG_SZ, fLen+1)
+	  fregfile.io.write_ports(0).bits.mask := RegNext(alloc_mask(0)) 
    } else {
       fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, TPREG_SZ, fLen+1)
+	  fregfile.io.write_ports(0).bits.mask := alloc_mask(0)
    }
 
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
    when (ifpu_resp.valid) { assert (ifpu_resp.bits.uop.ctrl.rf_wen && ifpu_resp.bits.uop.dst_rtype === RT_FLT) }
-
 
    var w_cnt = 1
    var toint_found = false
@@ -253,8 +297,8 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             fregfile.io.write_ports(w_cnt).valid :=
                wbresp.valid &&
                wbresp.bits.uop.ctrl.rf_wen
-            fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.pdst
-            fregfile.io.write_ports(w_cnt).bits.mask := wbresp.bits.uop.dst_mask
+            fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.vdst//???
+            fregfile.io.write_ports(w_cnt).bits.mask := alloc_mask(w_cnt)//wbresp.bits.uop.dst_mask
             fregfile.io.write_ports(w_cnt).bits.data := wbresp.bits.data
             wbresp.ready := fregfile.io.write_ports(w_cnt).ready
          }
@@ -285,6 +329,9 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    io.wakeups(0) <> ll_wbarb.io.out
    ll_wbarb.io.out.ready := Bool(true)
 
+   io.wakeups(0).bits.uop.pdst := alloc_pdst(0)
+   io.wakeups(0).bits.uop.dst_mask := alloc_mask(0)
+
    w_cnt = 1
    for (eu <- exe_units)
    {
@@ -296,6 +343,8 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             val wport = io.wakeups(w_cnt)
             wport <> exe_resp
             wport.valid := exe_resp.valid && wb_uop.dst_rtype === RT_FLT
+            wport.bits.uop.pdst := alloc_pdst(w_cnt)
+			wport.bits.uop.dst_mask := alloc_mask(w_cnt)
 
             w_cnt += 1
 

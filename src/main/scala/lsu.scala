@@ -537,8 +537,8 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
       laq_addr          (exe_tlb_uop.ldq_idx)      := Mux(tlb_miss, exe_vaddr, exe_tlb_paddr)
       laq_uop           (exe_tlb_uop.ldq_idx).vdst := exe_tlb_uop.vdst
 	  //yqh
-      laq_uop           (exe_tlb_uop.ldq_idx).pdst := exe_tlb_uop.vdst
-      laq_uop           (exe_tlb_uop.ldq_idx).dst_mask := ~Bits(0, width = numIntPhysRegsParts)
+      laq_uop           (exe_tlb_uop.ldq_idx).pdst := exe_tlb_uop.pdst
+      laq_uop           (exe_tlb_uop.ldq_idx).dst_mask := exe_tlb_uop.dst_mask
       laq_is_virtual    (exe_tlb_uop.ldq_idx)      := tlb_miss
       laq_is_uncacheable(exe_tlb_uop.ldq_idx)      := tlb_addr_uncacheable && !tlb_miss
 
@@ -553,8 +553,8 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
       stq_uop       (exe_tlb_uop.stq_idx).vdst := exe_tlb_uop.vdst // needed for amo's TODO this is expensive,
                                                                    // can we get around this?
       // yqh
-      stq_uop       (exe_tlb_uop.stq_idx).pdst := exe_tlb_uop.vdst
-      stq_uop       (exe_tlb_uop.stq_idx).dst_mask := ~Bits(0, width = numIntPhysRegsParts)
+      stq_uop       (exe_tlb_uop.stq_idx).pdst := exe_tlb_uop.pdst
+      stq_uop       (exe_tlb_uop.stq_idx).dst_mask := exe_tlb_uop.dst_mask
       saq_is_virtual(exe_tlb_uop.stq_idx)      := tlb_miss
 
       assertNever(will_fire_sta_incoming && saq_val(exe_tlb_uop.stq_idx),

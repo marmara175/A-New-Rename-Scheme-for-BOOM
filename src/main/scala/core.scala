@@ -424,8 +424,160 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    rename_stage.io.dec_will_fire := dec_will_fire
    rename_stage.io.dec_uops := dec_uops
 
+   //yqh
+   //def MyEncode(data: UInt, data_size: Int, sub_size: Int): UInt =
+   //{
+   //   val nums = data_size / sub_size
+   //   val sub_datas = Wire(Vec(nums, UInt(sub_size.W)))
+   //
+   //   val this_data = Wire(UInt(width=data_size.W))
+   //   this_data := data
+   //
+   //   for (i <- 0 until nums)
+   //   {
+   //       val offset = i * sub_size
+   //	   sub_datas(i) := (this_data >> offset)(sub_size-1, 0)
+   //   }
+   //
+   //   val sign = sub_datas(nums-1)(sub_size-1).toBool
+   //   val base = Wire(UInt(width=sub_size.W))
+   //
+   //   when (sign)
+   //   {
+   //       base := (-1.S(sub_size.W)).asUInt()
+   //   }
+   //   .otherwise
+   //   {
+   //       base := 0.U(sub_size.W)
+   //   }
+   //
+   //   var res = 0.U(width=nums.W)
+   //   var j   = 0.U(width=nums.W)
+   //   for (i <- nums-1 to 1 by -1)
+   //   {
+   //       val sub = Wire(init = false.B)
+   //	   when (res === j && sub_datas(i) === base && sub_datas(i-1)(sub_size-1).toBool === sign)
+   //	   {
+   //	       sub := true.B
+   //	   }
+   //
+   //	   j = j + 1.U
+   //	   res = res + sub.asUInt()
+   //   }
+   //
+   //   nums.asUInt()-res
+   //}
+   //
+   //def ShiftByMask(data: UInt, data_size: Int, mask: UInt, mask_size: Int, mask_cnt_one: Int): UInt =
+   //{
+   //    val output = Wire(UInt(width=data_size.W))
+   //	val sub_size = data_size / mask_size
+   //	val sub_data = Wire(Vec(mask_cnt_one, UInt(width=sub_size.W)))
+   //
+   //	for (i <- 0 until mask_cnt_one)
+   //	{
+   //	    val left  = sub_size * i
+   //		val right = sub_size * (i+1) - 1
+   //		sub_data(i) := data(right, left)
+   //	}
+   //
+   //	var idx = 0.U
+   //	val tmp = Wire(Vec(mask_size, UInt(width=data_size.W)))
+   //	for (i <- 0 until mask_size)
+   //	{
+   //	    val asc = Wire(init=0.U)
+   //		tmp(i) := 0.U(width=data_size.W)
+   //		when (mask(i))
+   //		{
+   //		    tmp(i)  := sub_data(idx) << (i * sub_size)
+   //			asc     := 1.U
+   //		}
+   //
+   //		idx = idx + asc
+   //	}
+   //
+   //	output := tmp.reduce(_|_)
+   //	output
+   //}
+  
+   // fp
+
+   for (i <- 0 until fp_pipeline.io.wakeups.length)
+   {
+      rename_stage.io.fp_alloc_pregs(i).valid := fp_pipeline.io.fp_alloc_pregs(i).valid
+      rename_stage.io.fp_alloc_pregs(i).vreg  := fp_pipeline.io.fp_alloc_pregs(i).vreg
+      rename_stage.io.fp_alloc_pregs(i).nums  := fp_pipeline.io.fp_alloc_pregs(i).nums
+      fp_pipeline.io.fp_alloc_pregs(i).can_alloc := rename_stage.io.fp_alloc_pregs(i).can_alloc
+      fp_pipeline.io.fp_alloc_pregs(i).preg   := rename_stage.io.fp_alloc_pregs(i).preg
+      fp_pipeline.io.fp_alloc_pregs(i).mask   := rename_stage.io.fp_alloc_pregs(i).mask
+   }
+
+   // yqh
+   val can_alloc  = Wire(Vec(num_irf_write_ports, Bool()))
+   val alloc_pdst = Wire(Vec(num_irf_write_ports, UInt(width=TPREG_SZ)))
+   val alloc_mask = Wire(Vec(num_irf_write_ports, UInt(width=numIntPhysRegsParts)))
+   val shift_data = Wire(Vec(num_irf_write_ports, UInt(width=64)))
+
+   var al_idx = 0
+   for (i <- 0 until exe_units.length)
+   {
+      if (exe_units(i).is_mem_unit)
+	  {
+	     //要写回的
+	     rename_stage.io.int_alloc_pregs(al_idx).valid := ll_wbarb.io.out.fire()
+		 rename_stage.io.int_alloc_pregs(al_idx).vreg  := ll_wbarb.io.out.bits.uop.vdst
+		 rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U//MyEncode(ll_wbarb.io.out.bits.data)
+		 can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
+		 alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg
+		 alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+		 shift_data(al_idx):= ll_wbarb.io.out.bits.data//ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))
+		 //require( !ll_wbarb.io.out.fire() || can_alloc(al_idx)) 
+		 al_idx += 1
+	  }
+	  else
+	  {
+	     for (j <- 0 until exe_units(i).num_rf_write_ports)
+		 {
+		    val wbresp = exe_units(i).io.resp(j)
+            
+            def wbIsValid(rtype: UInt) =
+			   wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && wbresp.bits.uop.dst_rtype === rtype
+			val wbReadsCSR = wbresp.bits.uop.ctrl.csr_cmd =/= rocket.CSR.N
+
+			if (exe_units(i).uses_csr_wport && (j == 0))
+			{
+			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX)
+			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
+			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U
+
+			   can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
+			   alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg
+			   alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+               shift_data(al_idx):= Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
+
+			   //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
+			}
+			else
+			{
+			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX)
+			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
+			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U
+
+			   can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
+			   alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg
+			   alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+			   shift_data(al_idx):= wbresp.bits.data
+
+			   //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
+			}
+
+            al_idx += 1
+		 }
+	  }
+   }
 
    var wu_idx = 0
+   var swu_idx = 0
    // loop through each issue-port (exe_units are statically connected to an issue-port)
    for (i <- 0 until exe_units.length)
    {
@@ -434,7 +586,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          // If Memory, it's the shared long-latency port.
          int_wakeups(wu_idx).valid := ll_wbarb.io.out.fire()
          int_wakeups(wu_idx).bits  := ll_wbarb.io.out.bits
-         wu_idx += 1
+         
+		 // yqh
+		 int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
+		 int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
+		 int_wakeups(wu_idx).bits.data     := shift_data(swu_idx)
+		 wu_idx += 1
+		 swu_idx += 1
       }
       else
       {
@@ -446,6 +604,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
                                          iss_uops(i).dst_rtype === RT_FIX &&
                                          iss_uops(i).ldst_val
             int_wakeups(wu_idx).bits.uop := iss_uops(i)
+			//yqh
+			int_wakeups(wu_idx).bits.uop.dst_mask := ~Bits(0, numIntPhysRegsParts)
             wu_idx += 1
             assert (!(iss_uops(i).dst_rtype === RT_FLT && iss_uops(i).bypassable), "Bypassing FP is not supported.")
          }
@@ -456,11 +616,17 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             val resp = exe_units(i).io.resp(j)
             int_wakeups(wu_idx).valid := resp.valid &&
                                          resp.bits.uop.ctrl.rf_wen &&
-                                        !resp.bits.uop.bypassable &&
+                                         resp.bits.uop.bypassable &&
                                          resp.bits.uop.dst_rtype === RT_FIX
             int_wakeups(wu_idx).bits := exe_units(i).io.resp(j).bits
-            wu_idx += 1
 
+            // yqh
+		    int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
+		    int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
+		    int_wakeups(wu_idx).bits.data     := shift_data(swu_idx)
+            
+			wu_idx += 1
+			swu_idx += 1
          }
       }
       require (exe_units(i).usesIRF)
@@ -579,12 +745,12 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       require (iu.io.wakeup_vdsts.length == int_wakeups.length)
    }
 
-   for {iu <- issue_units
-        (pdst, mask) <- iu.io.wakeup_pdsts zip iu.io.wakeup_masks
-   }{
-      pdst    := UInt(0)
-      mask    := ~Bits(0, width = numIntPhysRegsParts)
-   }
+   //for {iu <- issue_units
+   //     (pdst, mask) <- iu.io.wakeup_pdsts zip iu.io.wakeup_masks
+   //}{
+   //   pdst    := UInt(0)
+   //   mask    := ~Bits(0, width = numIntPhysRegsParts)
+   //}
 
 
    //-------------------------------------------------------------
@@ -741,10 +907,11 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       for (j <- 0 until exe_units(i).num_rf_write_ports)
       {
          val wbresp = exe_units(i).io.resp(j)
-         //yqh
-         val wbpdst = wbresp.bits.uop.pdst
-         val wbmask = wbresp.bits.uop.dst_mask
-         val wbdata = wbresp.bits.data
+
+		 val wbpdst = alloc_pdst(w_cnt)
+		 val wbmask = alloc_mask(w_cnt)
+		 val wbdata = shift_data(w_cnt)
+		 val wbvdst = wbresp.bits.uop.vdst
 
          def wbIsValid(rtype: UInt) =
             wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && wbresp.bits.uop.dst_rtype === rtype
@@ -760,9 +927,9 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          if (exe_units(i).uses_csr_wport && (j == 0))
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
+            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst //???
             iregfile.io.write_ports(w_cnt).bits.mask := wbmask 
-            iregfile.io.write_ports(w_cnt).bits.data := Mux(wbReadsCSR, csr.io.rw.rdata, wbdata)
+            iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
          }
          else if (exe_units(i).is_mem_unit)
@@ -774,13 +941,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             // connect to FP pipeline's long latency writeport.
             fp_pipeline.io.ll_wport.valid     := wbIsValid(RT_FLT)
             fp_pipeline.io.ll_wport.bits.uop  := wbresp.bits.uop
-            fp_pipeline.io.ll_wport.bits.data := wbdata
+            fp_pipeline.io.ll_wport.bits.data := wbresp.bits.data
             fp_pipeline.io.ll_wport.bits.fflags.valid := Bool(false)
          }
          else
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
+            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst
             iregfile.io.write_ports(w_cnt).bits.mask := wbmask
             iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
@@ -818,8 +985,16 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
    ll_wbarb.io.in(1) <> fp_pipeline.io.toint
    iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, TPREG_SZ, xLen)
+   //yqh
+   //iregfile.io.write_ports(llidx).addr := alloc_pdst(llidx)
+   iregfile.io.write_ports(llidx).bits.mask := alloc_mask(llidx)
+   iregfile.io.write_ports(llidx).bits.data := shift_data(llidx)
 
-
+/*
+   val alloc_pdst = Wire(Vec(num_irf_write_ports, UInt(width=TPREG_SZ)))
+   val alloc_mask = Wire(Vec(num_irf_write_ports, UInt(width=numIntPhysRegsParts)))
+   val shift_data = Wire(Vec(num_irf_write_ports, UInt(width=64)))
+*/
 
    //-------------------------------------------------------------
    //-------------------------------------------------------------
