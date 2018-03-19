@@ -149,7 +149,6 @@ class RenameStage(
       pl_width,
       RT_FLT.litValue,
       numFpVPhysRegs))
-/*
    val f_v2p_maptable = Module(new RenameV2PMapTable(
        pl_width,
        RT_FLT.litValue,
@@ -162,7 +161,6 @@ class RenameStage(
 	   pl_width,
 	   RT_FLT.litValue,
 	   numFpPPhysRegs))
-	   */
    val fbusytable = Module(new BusyTable(
       pl_width,
       RT_FLT.litValue,
@@ -332,7 +330,7 @@ class RenameStage(
        i_v2p_maptable.io.allocpregs_pregs(w)	:= i_pfreelist.io.req_pregs(w)
        i_v2p_maptable.io.allocpregs_masks(w)	:= i_pfreelist.io.req_masks(w)
    }
-/*
+
    // f_v2p_maptable
    f_v2p_maptable.io.ren_will_fire 	:= ren2_will_fire
    f_v2p_maptable.io.ren_uops 		:= ren2_uops
@@ -349,7 +347,6 @@ class RenameStage(
        f_v2p_maptable.io.allocpregs_pregs(w)	:= f_pfreelist.io.req_pregs(w)
        f_v2p_maptable.io.allocpregs_masks(w)	:= f_pfreelist.io.req_masks(w)
    }
-*/
 
    //-------------------------------------------------------------
    // Physical Register FreeList
@@ -378,7 +375,6 @@ class RenameStage(
    i_pfreelist.io.rollback_masks 	:= i_v2p_maptable.io.rollback_masks
 
    // f_pfreelist
-/*
    for (w <- 0 until pl_width) {
        f_pfreelist.io.ren_uops(w)           := ren2_uops(w)
        f_pfreelist.io.ren_br_vals(w)        := ren2_will_fire(w) & ren2_uops(w).allocate_brtag
@@ -400,7 +396,6 @@ class RenameStage(
    f_pfreelist.io.rollback_wens 	:= f_v2p_maptable.io.rollback_valids 
    f_pfreelist.io.rollback_pdsts 	:= f_v2p_maptable.io.rollback_pdsts
    f_pfreelist.io.rollback_masks 	:= f_v2p_maptable.io.rollback_masks
-  */ 
    //-------------------------------------------------------------
    // Busy Table
 
@@ -450,11 +445,13 @@ class RenameStage(
       val fbusy_rs2_mask = Mux(fbusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
       val fbusy_rs3_mask = Mux(fbusy.rs3_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
 
-	  printf("imap(%d).prs1 = 0x%x", w.asUInt, i_v2p_maptable.io.values(w).prs1)
+	  //printf("imap(%d).prs1 = 0x%x", w.asUInt, i_v2p_maptable.io.values(w).prs1)
 
-      //uop.pop1      := i_v2p_maptable.io.values(w).prs1//Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs1, i_v2p_maptable.io.values(w).prs1)
-      //uop.pop2      := i_v2p_maptable.io.values(w).prs2//Mux(uop.lrs2_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs2, i_v2p_maptable.io.values(w).prs2)
-      //uop.pop3      := f_v2p_maptable.io.values(w).prs3// only FP has 3rd operand
+      //uop.pop1      := f_v2p_maptable.io.values(w).prs1
+	  uop.pop1  :=    Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs1, i_v2p_maptable.io.values(w).prs1)
+      //uop.pop2      := f_v2p_maptable.io.values(w).prs2
+	  uop.pop2  :=    Mux(uop.lrs2_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs2, i_v2p_maptable.io.values(w).prs2)
+      uop.pop3      := f_v2p_maptable.io.values(w).prs3// only FP has 3rd operand
 
 	  //uop.rs1_mask  := Mux(uop.lrs1_rtype === RT_FLT, fmap.prs1_mask, imap.prs1_mask)
 	  //uop.rs2_mask  := Mux(uop.lrs1_rtype === RT_FLT, fmap.prs2_mask, imap.prs2_mask)
