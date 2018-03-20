@@ -151,6 +151,8 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    val out_p2 = Wire(Bool()); out_p2 := slot_p2
    val out_p3 = Wire(Bool()); out_p3 := slot_p3
 
+   // yqh debug
+
    val updated_mask1	= Wire(UInt())
    val updated_mask2 	= Wire(UInt())
    val updated_mask3    = Wire(UInt())
@@ -176,7 +178,7 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
       //slotUop.pop3 := io.in_uop.bits.vop3
 
       //slotUop.pdst := io.in_uop.bits.vdst
-      //slotUop.dst_mask := ~Bits(0, width = numIntPhysRegsParts)
+      slotUop.dst_mask := ~Bits(0, width = numIntPhysRegsParts)
    }
    .otherwise
    {
@@ -198,18 +200,23 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
          out_p1        := Bool(true)
          updated_mask1 := io.wakeup_masks(i)
          updated_pop1  := io.wakeup_pdsts(i)
+
+		 printf("wakeup mask1 = 0x%x\n", updated_mask1)
       }
       when (io.wakeup_vdsts(i).valid && (slotUop.rs2_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop2))
       {
          out_p2        := Bool(true)
          updated_mask2 := io.wakeup_masks(i)
          updated_pop2  := io.wakeup_pdsts(i)
+		 printf("wakeup mask2 = 0x%x\n", updated_mask2)
       }
       when (io.wakeup_vdsts(i).valid && (slotUop.rs3_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop3))
       {
          out_p3 := Bool(true)
          updated_mask3 := io.wakeup_masks(i)
          updated_pop3  := io.wakeup_pdsts(i)
+
+		 printf("wakeup mask3 = 0x%x\n", updated_mask3)
       }
    }
 

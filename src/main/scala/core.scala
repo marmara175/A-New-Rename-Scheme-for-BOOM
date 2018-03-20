@@ -68,7 +68,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    val dec_serializer   = Module(new FetchSerializerNtoM)
    val decode_units     = for (w <- 0 until DECODE_WIDTH) yield { val d = Module(new DecodeUnit); d }
    val dec_brmask_logic = Module(new BranchMaskGenerationLogic(DECODE_WIDTH))
-   val rename_stage     = Module(new RenameStage(DECODE_WIDTH, num_wakeup_ports, fp_pipeline.io.wakeups.length))
+   val rename_stage     = Module(new RenameStage(DECODE_WIDTH, num_wakeup_ports, fp_pipeline.io.wakeups.length, num_irf_write_ports))
    val issue_units      = new boom.IssueUnits(num_wakeup_ports)
    val iregfile         = if (regreadLatency == 1 && enableCustomRf) {
                               Module(new RegisterFileSeqCustomArray(numIntPPhysRegs,
@@ -507,7 +507,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       rename_stage.io.fp_alloc_pregs(i).valid := fp_pipeline.io.fp_alloc_pregs(i).valid
       rename_stage.io.fp_alloc_pregs(i).vreg  := fp_pipeline.io.fp_alloc_pregs(i).vreg
       rename_stage.io.fp_alloc_pregs(i).nums  := fp_pipeline.io.fp_alloc_pregs(i).nums
-      fp_pipeline.io.fp_alloc_pregs(i).can_alloc := rename_stage.io.fp_alloc_pregs(i).can_alloc
+      rename_stage.io.fp_alloc_pregs(i).br_mask  := fp_pipeline.io.fp_alloc_pregs(i).br_mask 
+	  fp_pipeline.io.fp_alloc_pregs(i).can_alloc := rename_stage.io.fp_alloc_pregs(i).can_alloc
       fp_pipeline.io.fp_alloc_pregs(i).preg   := rename_stage.io.fp_alloc_pregs(i).preg
       fp_pipeline.io.fp_alloc_pregs(i).mask   := rename_stage.io.fp_alloc_pregs(i).mask
    }
@@ -524,14 +525,35 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       if (exe_units(i).is_mem_unit)
 	  {
 	     //要写回的
-	     rename_stage.io.int_alloc_pregs(al_idx).valid := ll_wbarb.io.out.fire()
+	     rename_stage.io.int_alloc_pregs(al_idx).valid := ll_wbarb.io.out.fire() && ll_wbarb.io.out.bits.uop.vdst != UInt(0)
 		 rename_stage.io.int_alloc_pregs(al_idx).vreg  := ll_wbarb.io.out.bits.uop.vdst
 		 rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U//MyEncode(ll_wbarb.io.out.bits.data)
-		 can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
-		 alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg
-		 alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+		 rename_stage.io.int_alloc_pregs(al_idx).br_mask := ll_wbarb.io.out.bits.uop.br_mask 
+		 when (ll_wbarb.io.out.bits.uop.vdst != UInt(0))
+		 {
+		    alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+		    alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg 
+		    can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
+		 }
+		 .otherwise
+		 {
+		    alloc_mask(al_idx):= ~Bits(0, numIntPhysRegsParts)
+			alloc_pdst(al_idx):= UInt(0)
+			can_alloc(al_idx) := true.B
+		 }
 		 shift_data(al_idx):= ll_wbarb.io.out.bits.data//ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))
-		 //require( !ll_wbarb.io.out.fire() || can_alloc(al_idx)) 
+
+	     //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+	     //{
+         //   printf("1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+	     //  al_idx.asUInt(), can_alloc(al_idx),
+	     //  al_idx.asUInt(), alloc_pdst(al_idx),
+	     //  al_idx.asUInt(), alloc_mask(al_idx))
+         //}
+         //require( !ll_wbarb.io.out.fire() || can_alloc(al_idx)) 
 		 al_idx += 1
 	  }
 	  else
@@ -546,28 +568,72 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
 			if (exe_units(i).uses_csr_wport && (j == 0))
 			{
-			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX)
+			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0)
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U
+			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
 
-			   can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
-			   alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg
-			   alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
-               shift_data(al_idx):= Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
-
-			   //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
-			}
+		       when (wbresp.bits.uop.vdst != UInt(0))
+		       {
+		          alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+		          alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg 
+		          can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
+		       }
+		       .otherwise
+		       {
+		          alloc_mask(al_idx):= ~Bits(0, numIntPhysRegsParts)
+		          alloc_pdst(al_idx):= UInt(0)
+		          can_alloc(al_idx) := true.B
+		       }
+			   
+			   shift_data(al_idx):= Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
+               
+			   //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+         	   //{
+               //  printf("2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
+	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+         	   //  al_idx.asUInt(), can_alloc(al_idx),
+         	   //  al_idx.asUInt(), alloc_pdst(al_idx),
+         	   //  al_idx.asUInt(), alloc_mask(al_idx),
+			   //  wbReadsCSR)
+         	   //}
+			  //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
+		    }
 			else
 			{
-			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX)
+			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0)
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U
+			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask
 
-			   can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
-			   alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg
-			   alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+		       when (wbresp.bits.uop.vdst != UInt(0))
+		       {
+		          alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
+		          alloc_pdst(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).preg 
+		          can_alloc(al_idx) := rename_stage.io.int_alloc_pregs(al_idx).can_alloc
+		       }
+		       .otherwise
+		       {
+		          alloc_mask(al_idx):= ~Bits(0, numIntPhysRegsParts)
+		          alloc_pdst(al_idx):= UInt(0)
+		          can_alloc(al_idx) := true.B
+		       }
+
 			   shift_data(al_idx):= wbresp.bits.data
 
+               //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+			   //{
+
+               //     printf("3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	           //     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+               //   	al_idx.asUInt(), can_alloc(al_idx),
+               // 	al_idx.asUInt(), alloc_pdst(al_idx),
+               // 	al_idx.asUInt(), alloc_mask(al_idx))
+               //}
 			   //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
 			}
 
@@ -591,6 +657,16 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		 int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
 		 int_wakeups(wu_idx).bits.data     := shift_data(swu_idx)
+
+		 //when (int_wakeups(wu_idx).valid)
+		 //{
+		 //	printf("wakeup 1111: valid(%d) = b%b, vdst(%d) = d%d, pdst(%d) = d%d, dst_mask(%d) = d%d\n", 
+		 //   	wu_idx.asUInt(), int_wakeups(wu_idx).valid,
+		 //   	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.vdst,
+		 //   	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.pdst,
+		 //   	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.dst_mask)
+		 //}
+
 		 wu_idx += 1
 		 swu_idx += 1
       }
@@ -604,11 +680,22 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
                                          iss_uops(i).dst_rtype === RT_FIX &&
                                          iss_uops(i).ldst_val
             int_wakeups(wu_idx).bits.uop := iss_uops(i)
+			
 			//yqh
 			int_wakeups(wu_idx).bits.uop.dst_mask := ~Bits(0, numIntPhysRegsParts)
+			
+		    //when (int_wakeups(wu_idx).valid)
+		    //{
+		    //	printf("wakeup 3333: valid(%d) = b%b, vdst(%d) = d%d, dst_mask(%d) = d%d\n", 
+		    //   	wu_idx.asUInt(), int_wakeups(wu_idx).valid,
+			//	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.vdst,
+		    //   	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.dst_mask)
+		    //}
+
             wu_idx += 1
             assert (!(iss_uops(i).dst_rtype === RT_FLT && iss_uops(i).bypassable), "Bypassing FP is not supported.")
-         }
+         
+		 }
 
          // Slow Wakeup (uses write-port to register file)
          for (j <- 0 until exe_units(i).num_rf_write_ports)
@@ -616,7 +703,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             val resp = exe_units(i).io.resp(j)
             int_wakeups(wu_idx).valid := resp.valid &&
                                          resp.bits.uop.ctrl.rf_wen &&
-                                         resp.bits.uop.bypassable &&
+                                         //resp.bits.uop.bypassable &&
                                          resp.bits.uop.dst_rtype === RT_FIX
             int_wakeups(wu_idx).bits := exe_units(i).io.resp(j).bits
 
@@ -624,7 +711,16 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		    int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		    int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
 		    int_wakeups(wu_idx).bits.data     := shift_data(swu_idx)
-            
+   
+		    //when (int_wakeups(wu_idx).valid)
+		    //{
+		    //	printf("wakeup 2222: valid(%d) = b%b, vdst(%d) = d%d, pdst(%d) = d%d, dst_mask(%d) = d%d\n", 
+		    //   	wu_idx.asUInt(), int_wakeups(wu_idx).valid,
+			//	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.vdst,
+		    //   	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.pdst,
+		    //   	wu_idx.asUInt(), int_wakeups(wu_idx).bits.uop.dst_mask)
+		    //}
+
 			wu_idx += 1
 			swu_idx += 1
          }
@@ -735,6 +831,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
    // Wakeup (Issue & Writeback)
 
+   // yqh debug
+
    for {
       iu <- issue_units
       (issport, wakeup) <- iu.io.wakeup_vdsts zip int_wakeups
@@ -742,17 +840,24 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       issport.valid := wakeup.valid
       issport.bits  := wakeup.bits.uop.vdst
 
+      //printf ("core.wakeup: issport.valid = b%b, vdst = d%d\n", issport.valid, issport.bits)
+
       require (iu.io.wakeup_vdsts.length == int_wakeups.length)
    }
 
-   //for {iu <- issue_units
-   //     (pdst, mask) <- iu.io.wakeup_pdsts zip iu.io.wakeup_masks
-   //}{
-   //   pdst    := UInt(0)
-   //   mask    := ~Bits(0, width = numIntPhysRegsParts)
-   //}
+   for {iu <- issue_units
+        (pdst, wakeup) <- iu.io.wakeup_pdsts zip int_wakeups
+   }{
+      pdst    := wakeup.bits.uop.pdst
+      //printf ("core.wakeup: issport.pdst = d%d\n", pdst)
+   }
 
-
+   for {iu <- issue_units
+        (mask, wakeup) <- iu.io.wakeup_masks zip int_wakeups
+   }{
+      mask    := wakeup.bits.uop.dst_mask
+	  //printf ("core.wakeup: issport.dst_mask = d%d\n", mask)
+   }
    //-------------------------------------------------------------
    //-------------------------------------------------------------
    // **** Register Read Stage ****

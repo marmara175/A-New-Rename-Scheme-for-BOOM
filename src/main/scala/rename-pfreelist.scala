@@ -15,7 +15,7 @@ class PFreeListIO(
     (implicit p: Parameters) extends BoomBundle()(p)
 {
     private val preg_sz		= log2Up(num_physical_registers)
-    private val part_num_sz	= log2Up(numIntPhysRegsParts)
+    private val part_num_sz	= log2Up(numIntPhysRegsParts) + 1
 
     val req_preg_vals 		= Vec(num_write_ports, Bool()).asInput
     val req_part_nums		= Vec(num_write_ports, UInt(width=part_num_sz)).asInput
@@ -254,6 +254,21 @@ class RenamePFreeListHelper(
 	io.req_masks := request_masks
 	io.can_allocate := allocated
 
+    for (i <- 0 until num_write_ports)
+	{
+	   val idx = i.asUInt()
+	   when (io.req_preg_vals(i))
+	   {
+          printf ("req_preg_vals(%d) = b%b, req_part_nums(%d) = d%d, can_allocate(%d) = b%b, req_pregs(%d) = d%d, req_masks(%d) = x%x\n",
+	      idx, io.req_preg_vals(i), 
+		  idx, io.req_part_nums(i), 
+		  idx, io.can_allocate(i), 
+		  idx, io.req_pregs(i), 
+		  idx, io.req_masks(i))
+
+		  printf ("freelist = x%x\n", freelist)
+	   }
+    }
 }
 
 class RenamePFreeList(
@@ -264,7 +279,7 @@ class RenamePFreeList(
     (implicit p: Parameters) extends BoomModule()(p)
 {
     private val preg_sz = TPREG_SZ
-	private val part_num_sz= log2Up(numIntPhysRegsParts)
+	private val part_num_sz= log2Up(numIntPhysRegsParts) + 1
 
     val io = new Bundle
     {
@@ -276,6 +291,7 @@ class RenamePFreeList(
 		// request allocate physical register
     	val req_preg_vals   = Vec(num_write_ports, Bool()).asInput
 		val req_part_nums   = Vec(num_write_ports, UInt(width=part_num_sz)).asInput
+		val req_br_mask     = Vec(num_write_ports, UInt(width = MAX_BR_COUNT)).asInput
 		// allocated physical register
 		val can_allocate    = Vec(num_write_ports, Bool()).asOutput
 		val req_pregs       = Vec(num_write_ports, UInt(width=preg_sz)).asOutput
@@ -314,6 +330,14 @@ class RenamePFreeList(
 
     pfreelist.io.req_preg_vals := io.req_preg_vals
     pfreelist.io.req_part_nums := io.req_part_nums
+	pfreelist.io.req_br_mask   := io.req_br_mask
+
+	//for (i <- 0 until num_write_ports)
+	//{
+	//	printf("io.req_preg_vals(%d) = b%b, io.req_part_nums(%d) = d%d\n",
+	//		i.asUInt(), io.req_preg_vals(i),
+	//		i.asUInt(), io.req_part_nums(i))
+	//}
 
     io.can_allocate := pfreelist.io.can_allocate
     io.req_pregs := pfreelist.io.req_pregs 

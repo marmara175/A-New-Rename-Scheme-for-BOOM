@@ -25,11 +25,13 @@ import config.Parameters
 class AllocToRenameIO(
    vreg_sz: Int,
    preg_sz: Int,
-   mask_sz: Int) extends Bundle
+   mask_sz: Int)
+   (implicit p: Parameters) extends BoomBundle()(p)
 {
    val valid     = Bool(INPUT)
    val vreg      = UInt(INPUT, width=vreg_sz)
    val nums      = UInt(INPUT, width=mask_sz)
+   val br_mask   = UInt(INPUT, width=MAX_BR_COUNT)
    val can_alloc = Bool(OUTPUT)
    val preg      = UInt(OUTPUT, width=preg_sz)
    val mask      = UInt(OUTPUT, width=mask_sz)
@@ -42,7 +44,8 @@ class RenameStageIO(
    num_int_pregs: Int,
    num_fp_pregs: Int,
    num_int_wb_ports: Int,
-   num_fp_wb_ports: Int)
+   num_fp_wb_ports: Int,
+   num_myint_wb_ports: Int)
    (implicit p: Parameters) extends BoomBundle()(p)
 {
    private val int_preg_sz = TPREG_SZ
@@ -72,7 +75,8 @@ class RenameStageIO(
    val dis_inst_can_proceed = Vec(DISPATCH_WIDTH, Bool()).asInput
 
    // alloc physical register stage, yqh
-   val int_alloc_pregs = Vec(num_int_wb_ports, new AllocToRenameIO(TPREG_SZ, TPREG_SZ, numIntPhysRegsParts))
+   // yqh debug
+   val int_alloc_pregs = Vec(num_myint_wb_ports, new AllocToRenameIO(TPREG_SZ, TPREG_SZ, numIntPhysRegsParts))
    val fp_alloc_pregs  = Vec(num_fp_wb_ports, new AllocToRenameIO(TPREG_SZ, TPREG_SZ, numIntPhysRegsParts))
 
    // issue stage (fast wakeup)
@@ -106,10 +110,11 @@ class DebugRenameStageIO(int_num_pregs: Int, fp_num_pregs: Int)(implicit p: Para
 class RenameStage(
    pl_width: Int,
    num_int_wb_ports: Int,
-   num_fp_wb_ports: Int)
+   num_fp_wb_ports: Int,
+   num_myint_wb_ports: Int)
 (implicit p: Parameters) extends BoomModule()(p)
 {
-   val io = new RenameStageIO(pl_width, numIntVPhysRegs, numFpVPhysRegs, num_int_wb_ports, num_fp_wb_ports)
+   val io = new RenameStageIO(pl_width, numIntVPhysRegs, numFpVPhysRegs, num_int_wb_ports, num_fp_wb_ports, num_myint_wb_ports)
 
    // integer registers
    val i_l2v_maptable = Module(new RenameL2VMapTable(
@@ -121,15 +126,16 @@ class RenameStage(
       pl_width,
       RT_FIX.litValue,
       numIntVPhysRegs))
+   // yqh debug
    val i_v2p_maptable = Module(new RenameV2PMapTable(
        pl_width,
        RT_FIX.litValue,
        numIntVPhysRegs,
        numIntPPhysRegs,
        pl_width*2,
-       num_int_wb_ports))
+       num_myint_wb_ports))
    val i_pfreelist = Module(new RenamePFreeList(
-       num_int_wb_ports,
+       num_myint_wb_ports,
 	   pl_width,
 	   RT_FIX.litValue,
 	   numIntPPhysRegs))
@@ -145,6 +151,7 @@ class RenameStage(
       RT_FLT.litValue,
       32,
       numFpVPhysRegs))
+   // yqh debug
    val f_vfreelist = Module(new RenameVFreeList(
       pl_width,
       RT_FLT.litValue,
@@ -314,6 +321,8 @@ class RenameStage(
    //-------------------------------------------------------------
    // V2P MapTable by yqh
 
+   // yqh debug
+
    // i_v2p_maptable
    i_v2p_maptable.io.ren_will_fire 	:= ren2_will_fire
    i_v2p_maptable.io.ren_uops 		:= ren2_uops
@@ -323,7 +332,7 @@ class RenameStage(
    i_v2p_maptable.io.com_uops		:= io.com_uops
    i_v2p_maptable.io.com_rbk_valids	:= io.com_rbk_valids
 
-   for (w <- 0 until num_int_wb_ports)
+   for (w <- 0 until num_myint_wb_ports)
    { 
        i_v2p_maptable.io.allocpregs_valids(w)	:= i_pfreelist.io.can_allocate(w)
        i_v2p_maptable.io.allocpregs_vregs(w)	:= io.int_alloc_pregs(w).vreg
@@ -357,9 +366,13 @@ class RenameStage(
        i_pfreelist.io.ren_br_vals(w)        := ren2_will_fire(w) & ren2_uops(w).allocate_brtag
    }
 
-   for (w <- 0 until num_int_wb_ports) {
+   for (w <- 0 until num_myint_wb_ports) {
        i_pfreelist.io.req_preg_vals(w)      := io.int_alloc_pregs(w).valid
        i_pfreelist.io.req_part_nums(w)      := io.int_alloc_pregs(w).nums
+	   i_pfreelist.io.req_br_mask(w)        := io.int_alloc_pregs(w).br_mask
+	   //printf ("io.int_alloc_pregs(%d).valid = b%b, io.int_alloc_pregs(%d).nums = d%d\n", 
+	   //		w.asUInt(), io.int_alloc_pregs(w).valid,
+	   //		w.asUInt(), io.int_alloc_pregs(w).nums)
        io.int_alloc_pregs(w).can_alloc      := i_pfreelist.io.can_allocate(w)
        io.int_alloc_pregs(w).preg           := i_pfreelist.io.req_pregs(w)
        io.int_alloc_pregs(w).mask           := i_pfreelist.io.req_masks(w)
@@ -383,6 +396,7 @@ class RenameStage(
    for (w <- 0 until num_fp_wb_ports) {
        f_pfreelist.io.req_preg_vals(w)      := io.fp_alloc_pregs(w).valid
        f_pfreelist.io.req_part_nums(w)      := io.fp_alloc_pregs(w).nums
+	   f_pfreelist.io.req_br_mask(w)        := io.fp_alloc_pregs(w).br_mask
        io.fp_alloc_pregs(w).can_alloc       := f_pfreelist.io.can_allocate(w)
        io.fp_alloc_pregs(w).preg            := f_pfreelist.io.req_pregs(w)
        io.fp_alloc_pregs(w).mask            := f_pfreelist.io.req_masks(w)
@@ -445,18 +459,20 @@ class RenameStage(
       val fbusy_rs2_mask = Mux(fbusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
       val fbusy_rs3_mask = Mux(fbusy.rs3_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
 
-	  //printf("imap(%d).prs1 = 0x%x", w.asUInt, i_v2p_maptable.io.values(w).prs1)
+      // yqh debug
 
-      //uop.pop1      := f_v2p_maptable.io.values(w).prs1
 	  uop.pop1  :=    Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs1, i_v2p_maptable.io.values(w).prs1)
-      //uop.pop2      := f_v2p_maptable.io.values(w).prs2
 	  uop.pop2  :=    Mux(uop.lrs2_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs2, i_v2p_maptable.io.values(w).prs2)
       uop.pop3      := f_v2p_maptable.io.values(w).prs3// only FP has 3rd operand
 
-	  //uop.rs1_mask  := Mux(uop.lrs1_rtype === RT_FLT, fmap.prs1_mask, imap.prs1_mask)
-	  //uop.rs2_mask  := Mux(uop.lrs1_rtype === RT_FLT, fmap.prs2_mask, imap.prs2_mask)
-	  //uop.rs3_mask  := f_v2p_maptable.io.values(w).prs3_mask
+	  //printf("v2p_maptable: pop1 = %d, pop2 = %d, pop3 = %d\n", uop.pop1, uop.pop2, uop.pop3)
+
+	  uop.rs1_mask  := Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs1_mask, i_v2p_maptable.io.values(w).prs1_mask)
+	  uop.rs2_mask  := Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs2_mask, i_v2p_maptable.io.values(w).prs2_mask)
+	  uop.rs3_mask  := f_v2p_maptable.io.values(w).prs3_mask
       
+      //printf("v2p_maptable: mask1 = %d, mask2 = %d, mask3 = %d\n", uop.rs1_mask, uop.rs1_mask, uop.rs1_mask)
+
 	  uop.rs1_mask := Mux(uop.lrs1_rtype === RT_FLT, fbusy_rs1_mask, ibusy_rs1_mask)
       uop.rs2_mask := Mux(uop.lrs2_rtype === RT_FLT, fbusy_rs2_mask, ibusy_rs2_mask)
       uop.rs3_mask := fbusy_rs3_mask
