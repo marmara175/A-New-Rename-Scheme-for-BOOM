@@ -157,13 +157,10 @@ class RegisterRead(
       // If rrdLatency==1, we need to send read address at end of ISS stage,
       //    in order to get read data back at end of RRD stage.
       require (regreadLatency == 0 || regreadLatency == 1)
-      // yqh debug
-      val rs1_addr = io.iss_uops(w).vop1
-      //val rs1_mask = io.iss_uops(w).rs1_mask
-      val rs2_addr = io.iss_uops(w).vop2
-      //val rs2_mask = io.iss_uops(w).rs2_mask
-      val rs3_addr = io.iss_uops(w).vop3
-      //val rs3_mask = io.iss_uops(w).rs3_mask
+      // yqh debug2
+      val rs1_addr = io.iss_uops(w).pop1
+      val rs2_addr = io.iss_uops(w).pop2
+      val rs3_addr = io.iss_uops(w).pop3
 
       if (num_read_ports > 0)	io.rf_read_ports(idx+0).addr := rs1_addr
       if (num_read_ports > 1)	io.rf_read_ports(idx+1).addr := rs2_addr
@@ -224,11 +221,11 @@ class RegisterRead(
          //   && io.bypass.uop(b).dst_rtype === RT_FIX && lrs2_rtype === RT_FIX && (vop2 =/= UInt(0)), io.bypass.data(b)))
 
          // yqh
-         rs1_cases ++= Array((io.bypass.valid(b) && (mask1 =/= UInt(0)) && (vop1 === io.bypass.uop(b).vdst) && //???
+         rs1_cases ++= Array((io.bypass.valid(b) && (mask1 === UInt(0)) && (vop1 === io.bypass.uop(b).vdst) && //???
                               io.bypass.uop(b).ctrl.rf_wen && io.bypass.uop(b).dst_rtype === RT_FIX && 
                               lrs1_rtype === RT_FIX && (vop1 =/= UInt(0)), io.bypass.data(b)))
 
-         rs2_cases ++= Array((io.bypass.valid(b) && (mask2 =/= UInt(0)) && (vop2 === io.bypass.uop(b).vdst) && //???
+         rs2_cases ++= Array((io.bypass.valid(b) && (mask2 === UInt(0)) && (vop2 === io.bypass.uop(b).vdst) && //???
                               io.bypass.uop(b).ctrl.rf_wen && io.bypass.uop(b).dst_rtype === RT_FIX && 
                               lrs2_rtype === RT_FIX && (vop2 =/= UInt(0)), io.bypass.data(b)))
       }
@@ -263,15 +260,15 @@ class RegisterRead(
 
       io.exe_reqs(w).valid    := exe_reg_valids(w)
       io.exe_reqs(w).bits.uop := exe_reg_uops(w)
-      //if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := exe_reg_rs1_data(w)
-      //if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := exe_reg_rs2_data(w)
-      //if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := exe_reg_rs3_data(w)
+      if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := exe_reg_rs1_data(w)
+      if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := exe_reg_rs2_data(w)
+      if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := exe_reg_rs3_data(w)
 
-	  val rs1_data_decoded = MyDecode(exe_reg_rs1_data(w), register_width, exe_reg_uops(w).rs1_mask, numIntPhysRegsParts) 
-      val rs2_data_decoded = MyDecode(exe_reg_rs2_data(w), register_width, exe_reg_uops(w).rs2_mask, numIntPhysRegsParts)
-	  val rs3_data_decoded = MyDecode(exe_reg_rs3_data(w), register_width, exe_reg_uops(w).rs3_mask, numIntPhysRegsParts)
-	  if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := rs1_data_decoded
-      if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := rs2_data_decoded
-      if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := rs3_data_decoded
+	  //val rs1_data_decoded = MyDecode(exe_reg_rs1_data(w), register_width, exe_reg_uops(w).rs1_mask, numIntPhysRegsParts) 
+      //val rs2_data_decoded = MyDecode(exe_reg_rs2_data(w), register_width, exe_reg_uops(w).rs2_mask, numIntPhysRegsParts)
+	  //val rs3_data_decoded = MyDecode(exe_reg_rs3_data(w), register_width, exe_reg_uops(w).rs3_mask, numIntPhysRegsParts)
+	  //if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := rs1_data_decoded
+      //if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := rs2_data_decoded
+      //if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := rs3_data_decoded
    }
 }

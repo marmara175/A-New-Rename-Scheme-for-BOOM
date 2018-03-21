@@ -102,6 +102,7 @@ abstract class IssueUnit(
    }
 
    if (DEBUG_PRINTF)
+   //if (true)
    {
       val typ_str = if (iqType == IQT_INT.litValue) "int"
                     else if (iqType == IQT_MEM.litValue) "mem"
@@ -109,7 +110,7 @@ abstract class IssueUnit(
                     else "unknown"
       for (i <- 0 until num_issue_slots)
       {
-         printf("  " + typ_str + "_issue_slot[%d](%c)(Req:%c):wen=%c P:(%c,%c,%c) OP:(%d,%d,%d) PDST:%d %c [[DASM(%x)]" +
+         printf("  " + typ_str + "_issue_slot[%d](%c)(Req:%c):wen=%c P:(%c,%c,%c) VALID_OP:(%b, %b, %b) VOP:(%d,%d,%d) POP:(%d,%d,%d) RS_MASK:(%x, %x, %x) PDST:%d VDST:%d DST_MASK:%x %c [[DASM(%x)]" +
                " 0x%x: %d] ri:%d bm=%d imm=0x%x\n"
             , UInt(i, log2Up(num_issue_slots))
             , Mux(issue_slots(i).valid, Str("V"), Str("-"))
@@ -118,10 +119,21 @@ abstract class IssueUnit(
             , Mux(issue_slots(i).debug.p1, Str("!"), Str(" "))
             , Mux(issue_slots(i).debug.p2, Str("!"), Str(" "))
             , Mux(issue_slots(i).debug.p3, Str("!"), Str(" "))
+            , issue_slots(i).uop.lrs1_rtype =/= RT_X
+            , issue_slots(i).uop.lrs2_rtype =/= RT_X
+            , issue_slots(i).uop.frs3_en
             , issue_slots(i).uop.vop1
             , issue_slots(i).uop.vop2
             , issue_slots(i).uop.vop3
+            , issue_slots(i).uop.pop1
+            , issue_slots(i).uop.pop2
+            , issue_slots(i).uop.pop3
+            , issue_slots(i).uop.rs1_mask
+            , issue_slots(i).uop.rs2_mask
+            , issue_slots(i).uop.rs3_mask
+            , issue_slots(i).uop.pdst
             , issue_slots(i).uop.vdst
+            , issue_slots(i).uop.dst_mask
             , Mux(issue_slots(i).uop.dst_rtype === RT_FIX, Str("X"),
               Mux(issue_slots(i).uop.dst_rtype === RT_X, Str("-"),
               Mux(issue_slots(i).uop.dst_rtype === RT_FLT, Str("f"),
@@ -133,7 +145,8 @@ abstract class IssueUnit(
             , issue_slots(i).uop.br_mask
             , issue_slots(i).uop.imm_packed
             )
-      }
+	  }
+
       printf("-----------------------------------------------------------------------------------------\n")
    }
 }

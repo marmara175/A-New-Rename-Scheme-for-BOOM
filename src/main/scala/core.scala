@@ -545,7 +545,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
 	     //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
 	     //{
-         //   printf("1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+         //  printf("1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
 	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
 	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
 	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
@@ -553,7 +553,10 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 	     //  al_idx.asUInt(), alloc_pdst(al_idx),
 	     //  al_idx.asUInt(), alloc_mask(al_idx))
          //}
-         //require( !ll_wbarb.io.out.fire() || can_alloc(al_idx)) 
+         //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		 //{
+		 //   printf("error1 b%b\n", can_alloc(al_idx))
+		 //}
 		 al_idx += 1
 	  }
 	  else
@@ -599,7 +602,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          	   //  al_idx.asUInt(), alloc_mask(al_idx),
 			   //  wbReadsCSR)
          	   //}
-			  //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
+
+               //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		       //{
+		       //   printf("error1 b%b\n", can_alloc(al_idx))
+		       //}
+
+               //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
 		    }
 			else
 			{
@@ -634,6 +643,11 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
                // 	al_idx.asUInt(), alloc_pdst(al_idx),
                // 	al_idx.asUInt(), alloc_mask(al_idx))
                //}
+
+               //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		       //{
+		       //   printf("error1 b%b\n", can_alloc(al_idx))
+		       //}
 			   //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
 			}
 
@@ -656,7 +670,6 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 // yqh
 		 int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		 int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
-		 int_wakeups(wu_idx).bits.data     := shift_data(swu_idx)
 
 		 //when (int_wakeups(wu_idx).valid)
 		 //{
@@ -680,9 +693,6 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
                                          iss_uops(i).dst_rtype === RT_FIX &&
                                          iss_uops(i).ldst_val
             int_wakeups(wu_idx).bits.uop := iss_uops(i)
-			
-			//yqh
-			int_wakeups(wu_idx).bits.uop.dst_mask := ~Bits(0, numIntPhysRegsParts)
 			
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
@@ -710,7 +720,6 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             // yqh
 		    int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		    int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
-		    int_wakeups(wu_idx).bits.data     := shift_data(swu_idx)
    
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
@@ -1016,7 +1025,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 val wbpdst = alloc_pdst(w_cnt)
 		 val wbmask = alloc_mask(w_cnt)
 		 val wbdata = shift_data(w_cnt)
-		 val wbvdst = wbresp.bits.uop.vdst
+		 //val wbvdst = wbresp.bits.uop.vdst
 
          def wbIsValid(rtype: UInt) =
             wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && wbresp.bits.uop.dst_rtype === rtype
@@ -1032,7 +1041,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          if (exe_units(i).uses_csr_wport && (j == 0))
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst //???
+            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst //???
             iregfile.io.write_ports(w_cnt).bits.mask := wbmask 
             iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
@@ -1052,7 +1061,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          else
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst
+            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
             iregfile.io.write_ports(w_cnt).bits.mask := wbmask
             iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
@@ -1091,7 +1100,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    ll_wbarb.io.in(1) <> fp_pipeline.io.toint
    iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, TPREG_SZ, xLen)
    //yqh
-   //iregfile.io.write_ports(llidx).addr := alloc_pdst(llidx)
+   iregfile.io.write_ports(llidx).bits.addr := alloc_pdst(llidx)
    iregfile.io.write_ports(llidx).bits.mask := alloc_mask(llidx)
    iregfile.io.write_ports(llidx).bits.data := shift_data(llidx)
 
@@ -1362,6 +1371,31 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    // **** Handle Cycle-by-Cycle Printouts ****
    //-------------------------------------------------------------
    //-------------------------------------------------------------
+
+   if (true) {
+      // 每个有效操作数
+	  // busy=0
+	  // mask=0
+	  // bypass口一定能看到
+      // dis_uops
+      // bypasses.valid uop
+
+	  for (i <- 0 until DECODE_WIDTH)
+	  {
+	     when (dis_valids(i) && dis_uops(i).lrs1_rtype === RT_FIX && dis_uops(i).prs_busy(0) === 0.U && dis_uops(i).rs1_mask === 0.U)
+		 {
+		    printf("------------------------yqh------------------------------")
+			printf("dis_uop.vop1 = d%d\n", dis_uops(i).vop1)
+			printf("bypasses(0).valid = b%b, bypasses(0).uop.vdst = d%d\n", bypasses.valid(0), bypasses.uop(0).vdst)
+			printf("bypasses(1).valid = b%b, bypasses(1).uop.vdst = d%d\n", bypasses.valid(1), bypasses.uop(1).vdst)
+			printf("bypasses(2).valid = b%b, bypasses(2).uop.vdst = d%d\n", bypasses.valid(2), bypasses.uop(2).vdst)
+			printf("bypasses(3).valid = b%b, bypasses(3).uop.vdst = d%d\n", bypasses.valid(3), bypasses.uop(3).vdst)
+			printf("bypasses(4).valid = b%b, bypasses(4).uop.vdst = d%d\n", bypasses.valid(4), bypasses.uop(4).vdst)
+			printf("bypasses(5).valid = b%b, bypasses(5).uop.vdst = d%d\n", bypasses.valid(5), bypasses.uop(5).vdst)
+		 }
+	  }
+
+   }
 
    if (DEBUG_PRINTF)
    {

@@ -370,9 +370,6 @@ class RenameStage(
        i_pfreelist.io.req_preg_vals(w)      := io.int_alloc_pregs(w).valid
        i_pfreelist.io.req_part_nums(w)      := io.int_alloc_pregs(w).nums
 	   i_pfreelist.io.req_br_mask(w)        := io.int_alloc_pregs(w).br_mask
-	   //printf ("io.int_alloc_pregs(%d).valid = b%b, io.int_alloc_pregs(%d).nums = d%d\n", 
-	   //		w.asUInt(), io.int_alloc_pregs(w).valid,
-	   //		w.asUInt(), io.int_alloc_pregs(w).nums)
        io.int_alloc_pregs(w).can_alloc      := i_pfreelist.io.can_allocate(w)
        io.int_alloc_pregs(w).preg           := i_pfreelist.io.req_pregs(w)
        io.int_alloc_pregs(w).mask           := i_pfreelist.io.req_masks(w)
@@ -445,41 +442,30 @@ class RenameStage(
    assert (!(io.fp_wakeups.map(x => x.valid && x.bits.uop.dst_rtype =/= RT_FLT).reduce(_|_)),
       "[rename] fp wakeup is not waking up a FP register.")
 
-
    for ((uop, w) <- ren2_uops.zipWithIndex)
    {
-      val ibusy = ibusytable.io.values(w)
-      val fbusy = fbusytable.io.values(w)
-
-      // yqh
-      val ibusy_rs1_mask = Mux(ibusy.rs1_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-      val ibusy_rs2_mask = Mux(ibusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-
-      val fbusy_rs1_mask = Mux(fbusy.rs1_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-      val fbusy_rs2_mask = Mux(fbusy.rs2_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-      val fbusy_rs3_mask = Mux(fbusy.rs3_busy, Bits(0, width = numIntPhysRegsParts), ~Bits(0, width = numIntPhysRegsParts))
-
-      // yqh debug
-
-	  uop.pop1  :=    Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs1, i_v2p_maptable.io.values(w).prs1)
-	  uop.pop2  :=    Mux(uop.lrs2_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs2, i_v2p_maptable.io.values(w).prs2)
-      uop.pop3      := f_v2p_maptable.io.values(w).prs3// only FP has 3rd operand
-
-	  //printf("v2p_maptable: pop1 = %d, pop2 = %d, pop3 = %d\n", uop.pop1, uop.pop2, uop.pop3)
+	  uop.pop1  := Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs1, i_v2p_maptable.io.values(w).prs1)
+	  uop.pop2  := Mux(uop.lrs2_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs2, i_v2p_maptable.io.values(w).prs2)
+      uop.pop3  := f_v2p_maptable.io.values(w).prs3// only FP has 3rd operand
 
 	  uop.rs1_mask  := Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs1_mask, i_v2p_maptable.io.values(w).prs1_mask)
 	  uop.rs2_mask  := Mux(uop.lrs1_rtype === RT_FLT, f_v2p_maptable.io.values(w).prs2_mask, i_v2p_maptable.io.values(w).prs2_mask)
 	  uop.rs3_mask  := f_v2p_maptable.io.values(w).prs3_mask
-      
-      //printf("v2p_maptable: mask1 = %d, mask2 = %d, mask3 = %d\n", uop.rs1_mask, uop.rs1_mask, uop.rs1_mask)
+   }
 
-	  uop.rs1_mask := Mux(uop.lrs1_rtype === RT_FLT, fbusy_rs1_mask, ibusy_rs1_mask)
-      uop.rs2_mask := Mux(uop.lrs2_rtype === RT_FLT, fbusy_rs2_mask, ibusy_rs2_mask)
-      uop.rs3_mask := fbusy_rs3_mask
+   for ((uop, w) <- ren2_uops.zipWithIndex)
+   {
+      val ibusy = ibusytable.io.values(w)
+	  val fbusy = fbusytable.io.values(w)
 
-      val valid = ren2_valids(w)
-      assert (!(valid && ibusy.rs1_busy && uop.lrs1_rtype === RT_FIX && uop.lrs1 === UInt(0)), "[rename] x0 is busy??")
-      assert (!(valid && ibusy.rs2_busy && uop.lrs2_rtype === RT_FIX && uop.lrs2 === UInt(0)), "[rename] x0 is busy??")
+	  val b1 = Mux(uop.lrs1_rtype === RT_FLT, fbusy.prs1_busy, ibusy.prs1_busy)
+	  val b2 = Mux(uop.lrs2_rtype === RT_FLT, fbusy.prs2_busy, ibusy.prs2_busy)
+	  val b3 = fbusy.prs3_busy
+	  uop.prs_busy := b3 << 2 | b2 << 1 | b1
+
+	  val valid = ren2_valids(w)
+	  assert (!(valid && ibusy.prs1_busy && uop.lrs1_rtype === RT_FIX && uop.lrs1 === UInt(0)), "[rename] x0 is busy??")
+	  assert (!(valid && ibusy.prs2_busy && uop.lrs2_rtype === RT_FIX && uop.lrs2 === UInt(0)), "[rename] x0 is busy??")
    }
 
    //-------------------------------------------------------------

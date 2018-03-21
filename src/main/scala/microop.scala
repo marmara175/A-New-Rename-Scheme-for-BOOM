@@ -73,6 +73,8 @@ class MicroOp(implicit p: Parameters) extends BoomBundle()(p)
    val rs2_mask         = UInt(width = numIntPhysRegsParts)
    val rs3_mask         = UInt(width = numIntPhysRegsParts)
 
+   val prs_busy        = UInt(width=3)
+
    val exception        = Bool()
    val exc_cause        = UInt(width = xLen)          // TODO compress this down, xlen is insanity
    val bypassable       = Bool()                      // can we bypass ALU results? (doesn't include loads, csr, etc...)

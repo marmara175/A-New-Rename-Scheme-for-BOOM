@@ -42,7 +42,7 @@ object WritePort
    {
       val wport = Wire(Decoupled(new RegisterFileWritePort(addr_width, data_width)))
       wport.valid := enq.valid
-      wport.bits.addr := enq.bits.uop.vdst
+      wport.bits.addr := enq.bits.uop.pdst
       //yqh
       wport.bits.mask := enq.bits.uop.dst_mask
       wport.bits.data := enq.bits.data
@@ -90,6 +90,7 @@ class RegisterFileBehavorial(
 
    val regfile = Mem(num_registers, UInt(width=register_width))
 
+   /*
    // --------------------------------------------------------------
    // Write Merge
 
@@ -174,7 +175,7 @@ class RegisterFileBehavorial(
 	  merged_wport(i).bits.addr := addr
 	  merged_wport(i).bits.data := data | regfile(addr) & ~extend_mask(mask, numIntPhysRegsParts, register_width)
    }
-
+   */
    // --------------------------------------------------------------
    // Read ports.
 
@@ -196,14 +197,14 @@ class RegisterFileBehavorial(
             UInt(0),
             regfile(read_addrs(i)))
    }
-
+   /*
    for (i <- 0 until num_read_ports)
    {
       val bypass_ens = merged_wport.map(x => x.valid && x.bits.addr =/= UInt(0) && x.bits.addr === read_addrs(i)) 
       val bypass_data = Mux1H(Vec(bypass_ens), Vec(merged_wport.map(_.bits.data)))
       io.read_ports(i).data := Mux(bypass_ens.reduce(_|_), bypass_data, read_data(i))
    }
-  
+   
    // --------------------------------------------------------------
    // Write ports.
    for (wport <- merged_wport)
@@ -213,8 +214,8 @@ class RegisterFileBehavorial(
 	     regfile(wport.bits.addr) := wport.bits.data
 	  }
    }
+   */
    
-   /*
    // --------------------------------------------------------------
    // Bypass out of the ALU's write ports.
    // We are assuming we cannot bypass a writer to a reader within the regfile memory
@@ -260,5 +261,5 @@ class RegisterFileBehavorial(
          regfile(wport.bits.addr) := wport.bits.data
       }
    }
-   */
+   
 }

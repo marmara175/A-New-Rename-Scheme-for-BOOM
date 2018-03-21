@@ -254,21 +254,21 @@ class RenamePFreeListHelper(
 	io.req_masks := request_masks
 	io.can_allocate := allocated
 
-    for (i <- 0 until num_write_ports)
-	{
-	   val idx = i.asUInt()
-	   when (io.req_preg_vals(i))
-	   {
-          printf ("req_preg_vals(%d) = b%b, req_part_nums(%d) = d%d, can_allocate(%d) = b%b, req_pregs(%d) = d%d, req_masks(%d) = x%x\n",
-	      idx, io.req_preg_vals(i), 
-		  idx, io.req_part_nums(i), 
-		  idx, io.can_allocate(i), 
-		  idx, io.req_pregs(i), 
-		  idx, io.req_masks(i))
+    //for (i <- 0 until num_write_ports)
+	//{
+	//   val idx = i.asUInt()
+	//   when (io.req_preg_vals(i))
+	//   {
+    //      printf ("req_preg_vals(%d) = b%b, req_part_nums(%d) = d%d, can_allocate(%d) = b%b, req_pregs(%d) = d%d, req_masks(%d) = x%x\n",
+	//      idx, io.req_preg_vals(i), 
+	//	  idx, io.req_part_nums(i), 
+	//	  idx, io.can_allocate(i), 
+	//	  idx, io.req_pregs(i), 
+	//	  idx, io.req_masks(i))
 
-		  printf ("freelist = x%x\n", freelist)
-	   }
-    }
+	//	  printf ("freelist = x%x\n", freelist)
+	//   }
+    //}
 }
 
 class RenamePFreeList(

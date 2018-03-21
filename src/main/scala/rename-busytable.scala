@@ -30,7 +30,7 @@ class BusyTableIo(
    val p_rs_busy      = Vec(num_read_ports, Bool()).asOutput
 
    def prs(i:Int, w:Int):UInt      = p_rs     (w+i*pipeline_width)
-   def rs2_busy(i:Int, w:Int):Bool = p_rs_busy(w+i*pipeline_width)
+   def prs2_busy(i:Int, w:Int):Bool = p_rs_busy(w+i*pipeline_width)
 
    // marking new registers as busy
    val allocated_vdst = Vec(pipeline_width, new ValidIO(UInt(width=preg_sz))).flip
@@ -90,9 +90,9 @@ class BusyTableHelper(
 
 class BusyTableOutput extends Bundle
 {
-   val rs1_busy = Bool()
-   val rs2_busy = Bool()
-   val rs3_busy = Bool()
+   val prs1_busy = Bool()
+   val prs2_busy = Bool()
+   val prs3_busy = Bool()
 }
 
 
@@ -158,17 +158,17 @@ class BusyTable(
       busy_table.io.prs(0,w) := io.map_table(w).vrs1
       busy_table.io.prs(1,w) := io.map_table(w).vrs2
 
-      io.values(w).rs1_busy := io.ren_uops(w).lrs1_rtype === UInt(rtype) && (busy_table.io.rs2_busy(0,w) || vrs1_was_bypassed(w))
-      io.values(w).rs2_busy := io.ren_uops(w).lrs2_rtype === UInt(rtype) && (busy_table.io.rs2_busy(1,w) || vrs2_was_bypassed(w))
+      io.values(w).prs1_busy := io.ren_uops(w).lrs1_rtype === UInt(rtype) && (busy_table.io.prs2_busy(0,w) || vrs1_was_bypassed(w))
+      io.values(w).prs2_busy := io.ren_uops(w).lrs2_rtype === UInt(rtype) && (busy_table.io.prs2_busy(1,w) || vrs2_was_bypassed(w))
 
       if (rtype == RT_FLT.litValue)
       {
          busy_table.io.prs(2,w) := io.map_table(w).vrs3
-         io.values(w).rs3_busy := (io.ren_uops(w).frs3_en) && (busy_table.io.rs2_busy(2,w) || vrs3_was_bypassed(w))
+         io.values(w).prs3_busy := (io.ren_uops(w).frs3_en) && (busy_table.io.prs2_busy(2,w) || vrs3_was_bypassed(w))
       }
       else
       {
-         io.values(w).rs3_busy := Bool(false)
+         io.values(w).prs3_busy := Bool(false)
       }
 
 
