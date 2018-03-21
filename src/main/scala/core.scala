@@ -1380,12 +1380,43 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       // dis_uops
       // bypasses.valid uop
 
+	  //when (debug_tsc_reg < 150.U)
+	  //{
+         for (i <- 0 until DECODE_WIDTH)
+	     {
+		    when (dis_valids(i))
+			{
+		       printf("Dispatch: pc:x%x [[DASM(%x)] OP1_Int:%b, vop1 = d%d, DST_INT:%b, vdst:%d, cycles=%d\n", 
+			   dis_uops(i).pc(31,0), dis_uops(i).inst, 
+			   dis_uops(i).lrs1_rtype === RT_FIX, dis_uops(i).vop1,
+			   dis_uops(i).dst_rtype === RT_FIX, dis_uops(i).vdst, debug_tsc_reg)
+			}
+	     }
+         
+		 for (i <- 0 until exe_units.length)
+		 {
+		    when (iss_valids(i))
+			{
+			   printf("Issue: pc:x%x [[DASM(%x)], cycles=%d\n", iss_uops(i).pc(31,0), iss_uops(i).inst, debug_tsc_reg)
+			}
+		 }
+      //}
+
+      //iss_valids(w) 
+      //iss_uops(w)   
+      /*
 	  for (i <- 0 until DECODE_WIDTH)
 	  {
 	     when (dis_valids(i) && dis_uops(i).lrs1_rtype === RT_FIX && dis_uops(i).prs_busy(0) === 0.U && dis_uops(i).rs1_mask === 0.U)
 		 {
-		    printf("------------------------yqh------------------------------")
-			printf("dis_uop.vop1 = d%d\n", dis_uops(i).vop1)
+		    printf("------------------------yqh------------------------------\n")
+			printf("[[DASM(%x)] \n", dis_uops(i).inst)
+			printf("dis_valid = b%b, prs_busy = b%b, mask = b%b\n", dis_valids(i), dis_uops(i).prs_busy, dis_uops(i).rs1_mask)
+			printf("dis_uop.vop1 = d%d, cycle = d%d\n", dis_uops(i).vop1, debug_tsc_reg)
+			printf("iss(0).valid = b%b, bypasses(0).uop.vdst = d%d\n", iss_valids(0), iss_uops(0).vdst)
+			printf("iss(1).valid = b%b, bypasses(1).uop.vdst = d%d\n", iss_valids(1), iss_uops(1).vdst)
+			printf("iss(2).valid = b%b, bypasses(2).uop.vdst = d%d\n", iss_valids(2), iss_uops(2).vdst)
+
 			printf("bypasses(0).valid = b%b, bypasses(0).uop.vdst = d%d\n", bypasses.valid(0), bypasses.uop(0).vdst)
 			printf("bypasses(1).valid = b%b, bypasses(1).uop.vdst = d%d\n", bypasses.valid(1), bypasses.uop(1).vdst)
 			printf("bypasses(2).valid = b%b, bypasses(2).uop.vdst = d%d\n", bypasses.valid(2), bypasses.uop(2).vdst)
@@ -1394,6 +1425,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			printf("bypasses(5).valid = b%b, bypasses(5).uop.vdst = d%d\n", bypasses.valid(5), bypasses.uop(5).vdst)
 		 }
 	  }
+	  */
 
    }
 
