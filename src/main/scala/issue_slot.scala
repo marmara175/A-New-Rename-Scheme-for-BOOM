@@ -192,29 +192,29 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
 
    for (i <- 0 until num_slow_wakeup_ports)
    {
-      when (io.wakeup_vdsts(i).valid && (slotUop.rs1_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop1))
+      when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop1)
       {
          out_p1        := Bool(true)
          updated_mask1 := io.wakeup_masks(i)
          updated_pop1  := io.wakeup_pdsts(i)
 
-		 //printf("wakeup mask1 = 0x%x, updated_pop1 = d%d\n", updated_mask1, updated_pop1)
+		 printf("wakeup mask1 = 0x%x, updated_pop1 = d%d, vop1 = d%d\n", updated_mask1, updated_pop1, slotUop.vop1)
       }
-      when (io.wakeup_vdsts(i).valid && (slotUop.rs2_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop2))
+      when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop2)
       {
          out_p2        := Bool(true)
          updated_mask2 := io.wakeup_masks(i)
          updated_pop2  := io.wakeup_pdsts(i)
 		 
-		 //printf("wakeup mask2 = 0x%x, updated_pop2 = d%d\n", updated_mask2, updated_pop2)
+		 printf("wakeup mask2 = 0x%x, updated_pop2 = d%d, vop2 = d%d\n", updated_mask2, updated_pop2, slotUop.vop2)
       }
-      when (io.wakeup_vdsts(i).valid && (slotUop.rs3_mask === UInt(0) && io.wakeup_vdsts(i).bits === slotUop.vop3))
+      when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop3)
       {
          out_p3 := Bool(true)
          updated_mask3 := io.wakeup_masks(i)
          updated_pop3  := io.wakeup_pdsts(i)
 
-		 //printf("wakeup mask3 = 0x%x, updated_pop3 = d%d\n", updated_mask3, updated_pop3)
+		 printf("wakeup mask3 = 0x%x, updated_pop3 = d%d, vop3 = d%d\n", updated_mask3, updated_pop3, slotUop.vop3)
       }
    }
 

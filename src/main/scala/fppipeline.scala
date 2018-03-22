@@ -271,11 +271,11 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       // (for regreadlatency >0).
       fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), TPREG_SZ, fLen+1)
 	  fregfile.io.write_ports(0).bits.mask := RegNext(alloc_mask(0))
-	  fregfile.io.write_ports(0).bits.addr := RegNext(alloc_pdst(0))
+	  //fregfile.io.write_ports(0).bits.addr := RegNext(alloc_pdst(0)) //yangqinghong
    } else {
       fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, TPREG_SZ, fLen+1)
 	  fregfile.io.write_ports(0).bits.mask := alloc_mask(0)
-	  fregfile.io.write_ports(0).bits.addr := alloc_pdst(0)
+	  //fregfile.io.write_ports(0).bits.addr := alloc_pdst(0) //yangqinghong
    }
 
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
@@ -301,7 +301,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             fregfile.io.write_ports(w_cnt).valid :=
                wbresp.valid &&
                wbresp.bits.uop.ctrl.rf_wen
-            fregfile.io.write_ports(w_cnt).bits.addr := alloc_pdst(w_cnt)//wbresp.bits.uop.vdst//???
+            fregfile.io.write_ports(w_cnt).bits.addr := wbresp.bits.uop.vdst//alloc_pdst(w_cnt) yangqinghong
             fregfile.io.write_ports(w_cnt).bits.mask := alloc_mask(w_cnt)//wbresp.bits.uop.dst_mask
             fregfile.io.write_ports(w_cnt).bits.data := wbresp.bits.data
             wbresp.ready := fregfile.io.write_ports(w_cnt).ready

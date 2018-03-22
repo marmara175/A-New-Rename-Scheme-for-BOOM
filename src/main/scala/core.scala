@@ -1025,7 +1025,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 val wbpdst = alloc_pdst(w_cnt)
 		 val wbmask = alloc_mask(w_cnt)
 		 val wbdata = shift_data(w_cnt)
-		 //val wbvdst = wbresp.bits.uop.vdst
+		 //yangqinghong
+		 val wbvdst = wbresp.bits.uop.vdst
 
          def wbIsValid(rtype: UInt) =
             wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && wbresp.bits.uop.dst_rtype === rtype
@@ -1041,7 +1042,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          if (exe_units(i).uses_csr_wport && (j == 0))
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst //???
+            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst //yangqinghong
             iregfile.io.write_ports(w_cnt).bits.mask := wbmask 
             iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
@@ -1061,7 +1062,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
          else
          {
             iregfile.io.write_ports(w_cnt).valid     := wbIsValid(RT_FIX)
-            iregfile.io.write_ports(w_cnt).bits.addr := wbpdst
+            iregfile.io.write_ports(w_cnt).bits.addr := wbvdst // yangqinghong
             iregfile.io.write_ports(w_cnt).bits.mask := wbmask
             iregfile.io.write_ports(w_cnt).bits.data := wbdata
             wbresp.ready := iregfile.io.write_ports(w_cnt).ready
@@ -1100,7 +1101,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    ll_wbarb.io.in(1) <> fp_pipeline.io.toint
    iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, TPREG_SZ, xLen)
    //yqh
-   iregfile.io.write_ports(llidx).bits.addr := alloc_pdst(llidx)
+   //iregfile.io.write_ports(llidx).bits.addr := alloc_pdst(llidx) // yangqinghong
    iregfile.io.write_ports(llidx).bits.mask := alloc_mask(llidx)
    iregfile.io.write_ports(llidx).bits.data := shift_data(llidx)
 
@@ -1372,7 +1373,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    //-------------------------------------------------------------
    //-------------------------------------------------------------
 
-   if (true) {
+   if (false) {
       // 每个有效操作数
 	  // busy=0
 	  // mask=0
