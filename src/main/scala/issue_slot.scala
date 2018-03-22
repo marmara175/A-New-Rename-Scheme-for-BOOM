@@ -169,9 +169,9 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
 
    when (io.in_uop.valid)
    {
-      next_p1 := !(io.in_uop.bits.prs_busy(0))
-	  next_p2 := !(io.in_uop.bits.prs_busy(1))
-	  next_p3 := !(io.in_uop.bits.prs_busy(2))
+      next_p1 := !(io.in_uop.bits.prs_busy(0)) || io.in_uop.bits.rs1_mask != UInt(0)
+	  next_p2 := !(io.in_uop.bits.prs_busy(1)) || io.in_uop.bits.rs2_mask != UInt(0)
+	  next_p3 := !(io.in_uop.bits.prs_busy(2)) || io.in_uop.bits.rs3_mask != UInt(0)
 
 	  // yqh debug2
       slotUop.pdst := UInt(0)
