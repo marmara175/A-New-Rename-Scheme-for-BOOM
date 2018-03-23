@@ -111,7 +111,7 @@ class WithMediumBooms extends Config((site, here, up) => {
       numFpPPhysRegisters = 64,
       numLsuEntries = 16,
       maxBrCount = 8,
-      regreadLatency = 1,
+      regreadLatency = 0,//yangqinghong
       renameLatency = 2,
       enableBpdF2Redirect = false,
       btb = BTBsaParameters(nSets=64, nWays=2, nRAS=8, tagSz=20, bypassCalls=false, rasCheckForEmpty=false),

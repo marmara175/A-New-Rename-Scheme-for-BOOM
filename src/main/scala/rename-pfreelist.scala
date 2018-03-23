@@ -26,11 +26,6 @@ class PFreeListIO(
     val req_pregs			= Vec(num_write_ports, UInt(width=preg_sz)).asOutput
     val req_masks			= Vec(num_write_ports, UInt(width=numIntPhysRegsParts)).asOutput
 
-    // committed and newly freed register
-    val enq_vals			= Vec(pl_width, Bool()).asInput
-    val enq_pregs			= Vec(pl_width, UInt(width=preg_sz)).asInput
-    val enq_masks			= Vec(pl_width, UInt(width=numIntPhysRegsParts)).asInput
-
     // handle branches (save copy of pfreelist on branch, merge on mispredict)
     val ren_br_vals			= Vec(pl_width, Bool()).asInput
     val ren_br_tags			= Vec(pl_width, UInt(width=BR_TAG_SZ)).asInput
@@ -38,6 +33,11 @@ class PFreeListIO(
     // handle mispredicts
     val br_mispredict_val 	= Bool(INPUT)
     val br_mispredict_tag 	= UInt(INPUT, BR_TAG_SZ)
+
+    // committed and newly freed register
+    val enq_vals			= Vec(pl_width, Bool()).asInput
+    val enq_pregs			= Vec(pl_width, UInt(width=preg_sz)).asInput
+    val enq_masks			= Vec(pl_width, UInt(width=numIntPhysRegsParts)).asInput
 
     // rollback (on exceptions)
     val rollback_wens		= Vec(pl_width, Bool()).asInput
@@ -212,7 +212,7 @@ class RenamePFreeListHelper(
 		{
 			when (allocated(w) === true.B && io.req_br_mask(w)(idx) === true.B)
 			{
-				just_allocation_lists(idx)(w) := cur_mask << (cur_preg * 4.U)
+				just_allocation_lists(idx)(w) := cur_mask << (cur_preg * UInt(numIntPhysRegsParts))
 			}
 		}
     }
@@ -229,6 +229,8 @@ class RenamePFreeListHelper(
 	// merge misspeculated allocation_list with free_list
 	val allocation_list = Wire(Bits(width = num_physical_registers * numIntPhysRegsParts))
 	allocation_list := allocation_lists(io.br_mispredict_tag)
+    val new_allocation_list = Wire(Bits(width = num_physical_registers * numIntPhysRegsParts))
+	new_allocation_list := just_allocation_lists(io.br_mispredict_tag).reduce(_|_)
 
     // Update the Free List
 	when (!io.br_mispredict_val)
@@ -237,12 +239,13 @@ class RenamePFreeListHelper(
 	}
 	.otherwise
 	{	
-		freelist := (freelist & ~req_free_list) | enq_free_list | allocation_list
+		freelist := (freelist & ~req_free_list) | enq_free_list | allocation_list | new_allocation_list
 	}
 
 	// set other branch allocation_lists to zero where allocation_list(j) == 1...
 	when (io.br_mispredict_val)
 	{
+	    //printf("mispredict: allocation_list = 0x%x\n", allocation_list)
 		for (i <- 0 until MAX_BR_COUNT)
 		{
 			allocation_lists(i) := allocation_lists(i) & ~allocation_list
@@ -332,16 +335,17 @@ class RenamePFreeList(
     pfreelist.io.req_part_nums := io.req_part_nums
 	pfreelist.io.req_br_mask   := io.req_br_mask
 
-	//for (i <- 0 until num_write_ports)
-	//{
-	//	printf("io.req_preg_vals(%d) = b%b, io.req_part_nums(%d) = d%d\n",
-	//		i.asUInt(), io.req_preg_vals(i),
-	//		i.asUInt(), io.req_part_nums(i))
-	//}
-
-    io.can_allocate := pfreelist.io.can_allocate
+	io.can_allocate := pfreelist.io.can_allocate
     io.req_pregs := pfreelist.io.req_pregs 
     io.req_masks := pfreelist.io.req_masks 
+
+	//for (i <- 0 until num_write_ports)
+	//{
+	//    when (io.can_allocate(i) =/= io.req_preg_vals(i))
+	//	{
+	//		printf ("error111: io.can_allocate = b%b, io.req_preg_vals = b%b\n", io.can_allocate(i), io.req_preg_vals(i))
+	//	}
+	//}
 
 	// 目的逻辑寄存器是0，ldst_val等于false
 	// 不会请求分配物理寄存器空间

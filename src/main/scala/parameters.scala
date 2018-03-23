@@ -47,7 +47,7 @@ case class BoomCoreParams(
    imulLatency: Int = 3,
    fetchLatency: Int = 3,
    renameLatency: Int = 2,
-   regreadLatency: Int = 1
+   regreadLatency: Int = 0//yangqinghong
 )
 
 trait HasBoomCoreParameters extends tile.HasCoreParameters

@@ -162,6 +162,31 @@ class RegisterRead(
 	  val rs1_addr = io.iss_uops(w).pop1
       val rs2_addr = io.iss_uops(w).pop2
       val rs3_addr = io.iss_uops(w).pop3
+/*
+      if (io.bypass.getNumPorts > 0)
+	  {
+      when (io.iss_uops(w).lrs1_rtype === RT_FIX && io.iss_uops(w).pop1 =/= io.iss_uops(w).vop1)
+	  {
+        val b0=(io.bypass.valid(0) && (io.iss_uops(w).vop1 === io.bypass.uop(0).vdst) && io.bypass.uop(0).ctrl.rf_wen && (io.bypass.uop(0).dst_rtype === RT_FIX)).toBool
+        val b1=(io.bypass.valid(1) && (io.iss_uops(w).vop1 === io.bypass.uop(1).vdst) && io.bypass.uop(1).ctrl.rf_wen && (io.bypass.uop(1).dst_rtype === RT_FIX)).toBool
+		val b2=(io.bypass.valid(2) && (io.iss_uops(w).vop1 === io.bypass.uop(2).vdst) && io.bypass.uop(2).ctrl.rf_wen && (io.bypass.uop(2).dst_rtype === RT_FIX)).toBool
+		val b3=(io.bypass.valid(3) && (io.iss_uops(w).vop1 === io.bypass.uop(3).vdst) && io.bypass.uop(3).ctrl.rf_wen && (io.bypass.uop(3).dst_rtype === RT_FIX)).toBool
+		val b4=(io.bypass.valid(4) && (io.iss_uops(w).vop1 === io.bypass.uop(4).vdst) && io.bypass.uop(4).ctrl.rf_wen && (io.bypass.uop(4).dst_rtype === RT_FIX)).toBool
+		val b5=(io.bypass.valid(5) && (io.iss_uops(w).vop1 === io.bypass.uop(5).vdst) && io.bypass.uop(5).ctrl.rf_wen && (io.bypass.uop(5).dst_rtype === RT_FIX)).toBool
+		printf ("yqh2: pop1=d%d, vop1=d%d, bypass=b%b\n", io.iss_uops(w).pop1, io.iss_uops(w).vop1, (b0|b1|b2|b3|b4|b5).asUInt)
+      }
+	  when (io.iss_uops(w).lrs2_rtype === RT_FIX && io.iss_uops(w).pop2 =/= io.iss_uops(w).vop2)
+	  {
+        val b0=(io.bypass.valid(0) && (io.iss_uops(w).vop2 === io.bypass.uop(0).vdst) && io.bypass.uop(0).ctrl.rf_wen && (io.bypass.uop(0).dst_rtype === RT_FIX)).toBool
+        val b1=(io.bypass.valid(1) && (io.iss_uops(w).vop2 === io.bypass.uop(1).vdst) && io.bypass.uop(1).ctrl.rf_wen && (io.bypass.uop(1).dst_rtype === RT_FIX)).toBool
+		val b2=(io.bypass.valid(2) && (io.iss_uops(w).vop2 === io.bypass.uop(2).vdst) && io.bypass.uop(2).ctrl.rf_wen && (io.bypass.uop(2).dst_rtype === RT_FIX)).toBool
+		val b3=(io.bypass.valid(3) && (io.iss_uops(w).vop2 === io.bypass.uop(3).vdst) && io.bypass.uop(3).ctrl.rf_wen && (io.bypass.uop(3).dst_rtype === RT_FIX)).toBool
+		val b4=(io.bypass.valid(4) && (io.iss_uops(w).vop2 === io.bypass.uop(4).vdst) && io.bypass.uop(4).ctrl.rf_wen && (io.bypass.uop(4).dst_rtype === RT_FIX)).toBool
+		val b5=(io.bypass.valid(5) && (io.iss_uops(w).vop2 === io.bypass.uop(5).vdst) && io.bypass.uop(5).ctrl.rf_wen && (io.bypass.uop(5).dst_rtype === RT_FIX)).toBool
+	    printf ("yqh2: pop2=d%d, vop2=d%d, bypass=b%b\n", io.iss_uops(w).pop2, io.iss_uops(w).vop2, (b0|b1|b2|b3|b4|b5).asUInt)
+	  }
+	  }
+*/
 
       if (num_read_ports > 0)	io.rf_read_ports(idx+0).addr := rs1_addr
       if (num_read_ports > 1)	io.rf_read_ports(idx+1).addr := rs2_addr

@@ -29,16 +29,18 @@ class V2PMapTableIo(
     def prs(i:Int, w:Int):UInt		= p_rs	(w+i*pipeline_width)
     def mask(i:Int, w:Int):UInt		= masks	(w+i*pipeline_width)
 
+    val enq_valids      = Vec(pipeline_width, Bool()).asInput
 	val enq_vregs     	= Vec(pipeline_width, UInt(width=vreg_sz)).asInput
 	val enq_pregs		= Vec(pipeline_width, UInt(width=preg_sz)).asOutput
 	val enq_masks		= Vec(pipeline_width, UInt(width=mask_sz)).asOutput
 
+    val rollback_valids = Vec(pipeline_width, Bool()).asInput
 	val rollback_vdsts 	= Vec(pipeline_width, UInt(width=vreg_sz)).asInput
 	val rollback_pdsts	= Vec(pipeline_width, UInt(width=preg_sz)).asOutput
 	val rollback_masks	= Vec(pipeline_width, UInt(width=mask_sz)).asOutput
 
     //clean new virtual register mapping
-    val allocated_vdst 	= Vec(pipeline_width, new ValidIO(UInt(width=vreg_sz))).flip
+    //val allocated_vdst 	= Vec(pipeline_width, new ValidIO(UInt(width=vreg_sz))).flip
 
     //build virtual register mapping
     val allocpregs_valids = Vec(num_wb_ports, Bool()).asInput
@@ -64,6 +66,7 @@ class V2PMapTableHelper(
     val v2p_maptable_pregs = Reg(init = Vec.fill(num_vregs) {UInt(0, preg_sz)})
     val v2p_maptable_masks = Reg(init = Vec.fill(num_vregs) {UInt(0, mask_sz)})
 
+    /*
     for (idx <- 0 until pipeline_width)
     {
         when (io.allocated_vdst(idx).valid)
@@ -73,6 +76,7 @@ class V2PMapTableHelper(
 			v2p_maptable_pregs(vreg) := Wire(init = UInt(0, width=preg_sz))
 		}
     }
+	*/
 
     for (idx <- 0 until num_wb_ports)
     {
@@ -98,16 +102,16 @@ class V2PMapTableHelper(
 
         when (r_vreg === UInt(0))
 		{
-		   io.p_rs(ridx) := UInt(0, width = preg_sz) 
+		   io.p_rs(ridx)  := UInt(0, width = preg_sz) 
 		   io.masks(ridx) := ~UInt(0, width = mask_sz) 
 		}
 
 		for (widx <- 0 until num_wb_ports)
 		{
 		    val w_valid = io.allocpregs_valids(widx)
-		    val w_vreg = io.allocpregs_vregs(widx)
-		    val w_preg = io.allocpregs_pregs(widx)
-		    val w_mask = io.allocpregs_masks(widx)
+		    val w_vreg  = io.allocpregs_vregs(widx)
+		    val w_preg  = io.allocpregs_pregs(widx)
+		    val w_mask  = io.allocpregs_masks(widx)
 
 		    when (w_valid && (w_vreg === r_vreg))
 		    {
@@ -116,19 +120,22 @@ class V2PMapTableHelper(
 		    }
 		}
 
+        /*
 		//同一周期的指令，前面指令写、后面指令读
 		//分配给前面指令的虚拟寄存器的映射还未清空
 		//所以需要旁路逻辑
 		for (cidx <- 0 until pipeline_width)
 		{
 		    val c_valid = io.allocated_vdst(cidx).valid
-		    val c_vreg = io.allocated_vdst(cidx).bits
+		    val c_vreg  = io.allocated_vdst(cidx).bits
 
 		    when (c_valid && (c_vreg === r_vreg))
 		    {
 				io.masks(ridx) := UInt(0, width=mask_sz)
+				io.p_rs(ridx)  := UInt(0, width=preg_sz)
 		    }
 		}
+		*/
     }
 
 	//ROB发起“回收”或者“回滚”，虚拟寄存器到物理寄存器的映射
@@ -137,7 +144,10 @@ class V2PMapTableHelper(
 	//handle enq & rollback vr->pr
 	for (ridx <- 0 until pipeline_width)
 	{
+		val enq_valid		= io.enq_valids(ridx)
 		val enq_vreg 		= io.enq_vregs(ridx)
+
+		val rollback_valid	= io.rollback_valids(ridx)
 		val rollback_vreg 	= io.rollback_vdsts(ridx)
 
 		//enq_pregs enq_masks rollback_pdsts rollback_masks
@@ -146,6 +156,17 @@ class V2PMapTableHelper(
 
 		io.rollback_pdsts(ridx)	:= v2p_maptable_pregs(rollback_vreg)
 		io.rollback_masks(ridx)	:= v2p_maptable_masks(rollback_vreg)
+
+		when (enq_valid)
+		{
+		   v2p_maptable_pregs(enq_vreg) := UInt(0)
+		   v2p_maptable_masks(enq_vreg) := UInt(0)
+		}
+		.elsewhen (rollback_valid)
+		{
+		   v2p_maptable_pregs(rollback_vreg) := UInt(0)
+		   v2p_maptable_masks(rollback_vreg) := UInt(0)
+		}
 	}
 }
 
@@ -240,10 +261,10 @@ class RenameV2PMapTable(
 		    io.values(w).prs3_mask := UInt(0, width=numIntPhysRegsParts)
 		}
 
-		v2p_maptable.io.allocated_vdst(w).valid := io.ren_will_fire(w) &&
-							io.ren_uops(w).ldst_val &&
-							io.ren_uops(w).dst_rtype === UInt(rtype)
-		v2p_maptable.io.allocated_vdst(w).bits := io.ren_uops(w).vdst//保证ren1就对ren_uops(w).vdst赋值
+		//v2p_maptable.io.allocated_vdst(w).valid := io.ren_will_fire(w) &&
+		//					io.ren_uops(w).ldst_val &&
+		//					io.ren_uops(w).dst_rtype === UInt(rtype)
+		//v2p_maptable.io.allocated_vdst(w).bits := io.ren_uops(w).vdst//保证ren1就对ren_uops(w).vdst赋值
     }
 
     v2p_maptable.io.allocpregs_valids := io.allocpregs_valids //???
@@ -253,17 +274,19 @@ class RenameV2PMapTable(
 
 	for (w <- 0 until pl_width)
 	{
-		v2p_maptable.io.enq_vregs(w) := io.com_uops(w).stale_vdst
 		io.enq_valids(w):= 	io.com_valids(w) &&
 							io.com_uops(w).dst_rtype === UInt(rtype) &&
 							(io.com_uops(w).stale_vdst =/= UInt(0) || UInt(rtype) === RT_FLT)
+		v2p_maptable.io.enq_valids(w):= io.enq_valids(w)
+		v2p_maptable.io.enq_vregs(w) := io.com_uops(w).stale_vdst
 		io.enq_pregs(w) := v2p_maptable.io.enq_pregs(w)
 		io.enq_masks(w) := v2p_maptable.io.enq_masks(w)
 
-		v2p_maptable.io.rollback_vdsts(w) := io.com_uops(w).vdst
 		io.rollback_valids(w)	:= 	io.com_rbk_valids(w) &&
 									(io.com_uops(w).vdst =/= UInt(0) || UInt(rtype) === RT_FLT) &&
 									io.com_uops(w).dst_rtype === UInt(rtype)
+		v2p_maptable.io.rollback_valids(w):= io.rollback_valids(w)
+		v2p_maptable.io.rollback_vdsts(w) := io.com_uops(w).vdst
 		io.rollback_pdsts(w) 	:= v2p_maptable.io.rollback_pdsts(w)
 		io.rollback_masks(w) 	:= v2p_maptable.io.rollback_masks(w)
 	}
