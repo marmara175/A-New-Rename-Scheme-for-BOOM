@@ -70,6 +70,7 @@ class V2PMapTableHelper(
 		{
 		    val vreg = io.allocated_vdst(idx).bits
 			v2p_maptable_masks(vreg) := Wire(init = UInt(0, width=mask_sz))
+			v2p_maptable_pregs(vreg) := Wire(init = UInt(0, width=preg_sz))
 		}
     }
 
@@ -94,6 +95,12 @@ class V2PMapTableHelper(
 
         io.p_rs(ridx) := v2p_maptable_pregs(r_vreg)
         io.masks(ridx) := v2p_maptable_masks(r_vreg)
+
+        when (r_vreg === UInt(0))
+		{
+		   io.p_rs(ridx) := UInt(0, width = preg_sz) 
+		   io.masks(ridx) := ~UInt(0, width = mask_sz) 
+		}
 
 		for (widx <- 0 until num_wb_ports)
 		{
@@ -138,14 +145,8 @@ class V2PMapTableHelper(
 		io.enq_masks(ridx)	:= v2p_maptable_masks(enq_vreg)
 
 		io.rollback_pdsts(ridx)	:= v2p_maptable_pregs(rollback_vreg)
-		io.rollback_pdsts(ridx)	:= v2p_maptable_masks(rollback_vreg)
+		io.rollback_masks(ridx)	:= v2p_maptable_masks(rollback_vreg)
 	}
-
-	//0号逻辑寄存器映射到0号物理寄存器
-	//0号物理寄存器不能被分配，值为0
-    v2p_maptable_pregs(0) := UInt(0, width = preg_sz)
-	v2p_maptable_masks(0) := ~UInt(0, width = mask_sz)
-
 }
 
 class V2PMapTableOutput(
