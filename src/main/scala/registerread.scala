@@ -279,11 +279,11 @@ class RegisterRead(
       if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := exe_reg_rs2_data(w)
       if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := exe_reg_rs3_data(w)
 
-	  //val rs1_data_decoded = MyDecode(exe_reg_rs1_data(w), register_width, exe_reg_uops(w).rs1_mask, numIntPhysRegsParts) 
-      //val rs2_data_decoded = MyDecode(exe_reg_rs2_data(w), register_width, exe_reg_uops(w).rs2_mask, numIntPhysRegsParts)
-	  //val rs3_data_decoded = MyDecode(exe_reg_rs3_data(w), register_width, exe_reg_uops(w).rs3_mask, numIntPhysRegsParts)
-	  //if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := rs1_data_decoded
-      //if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := rs2_data_decoded
-      //if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := rs3_data_decoded
+	  val rs1_data_decoded = MyDecode(exe_reg_rs1_data(w), register_width, exe_reg_uops(w).rs1_mask, numIntPhysRegsParts) 
+      val rs2_data_decoded = MyDecode(exe_reg_rs2_data(w), register_width, exe_reg_uops(w).rs2_mask, numIntPhysRegsParts)
+	  val rs3_data_decoded = MyDecode(exe_reg_rs3_data(w), register_width, exe_reg_uops(w).rs3_mask, numIntPhysRegsParts)
+	  if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := rs1_data_decoded
+      if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := rs2_data_decoded
+      if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := rs3_data_decoded
    }
 }

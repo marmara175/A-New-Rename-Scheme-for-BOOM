@@ -424,81 +424,81 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    rename_stage.io.dec_will_fire := dec_will_fire
    rename_stage.io.dec_uops := dec_uops
 
-   //yqh
-   //def MyEncode(data: UInt, data_size: Int, sub_size: Int): UInt =
-   //{
-   //   val nums = data_size / sub_size
-   //   val sub_datas = Wire(Vec(nums, UInt(sub_size.W)))
-   //
-   //   val this_data = Wire(UInt(width=data_size.W))
-   //   this_data := data
-   //
-   //   for (i <- 0 until nums)
-   //   {
-   //       val offset = i * sub_size
-   //	   sub_datas(i) := (this_data >> offset)(sub_size-1, 0)
-   //   }
-   //
-   //   val sign = sub_datas(nums-1)(sub_size-1).toBool
-   //   val base = Wire(UInt(width=sub_size.W))
-   //
-   //   when (sign)
-   //   {
-   //       base := (-1.S(sub_size.W)).asUInt()
-   //   }
-   //   .otherwise
-   //   {
-   //       base := 0.U(sub_size.W)
-   //   }
-   //
-   //   var res = 0.U(width=nums.W)
-   //   var j   = 0.U(width=nums.W)
-   //   for (i <- nums-1 to 1 by -1)
-   //   {
-   //       val sub = Wire(init = false.B)
-   //	   when (res === j && sub_datas(i) === base && sub_datas(i-1)(sub_size-1).toBool === sign)
-   //	   {
-   //	       sub := true.B
-   //	   }
-   //
-   //	   j = j + 1.U
-   //	   res = res + sub.asUInt()
-   //   }
-   //
-   //   nums.asUInt()-res
-   //}
-   //
-   //def ShiftByMask(data: UInt, data_size: Int, mask: UInt, mask_size: Int, mask_cnt_one: Int): UInt =
-   //{
-   //    val output = Wire(UInt(width=data_size.W))
-   //	val sub_size = data_size / mask_size
-   //	val sub_data = Wire(Vec(mask_cnt_one, UInt(width=sub_size.W)))
-   //
-   //	for (i <- 0 until mask_cnt_one)
-   //	{
-   //	    val left  = sub_size * i
-   //		val right = sub_size * (i+1) - 1
-   //		sub_data(i) := data(right, left)
-   //	}
-   //
-   //	var idx = 0.U
-   //	val tmp = Wire(Vec(mask_size, UInt(width=data_size.W)))
-   //	for (i <- 0 until mask_size)
-   //	{
-   //	    val asc = Wire(init=0.U)
-   //		tmp(i) := 0.U(width=data_size.W)
-   //		when (mask(i))
-   //		{
-   //		    tmp(i)  := sub_data(idx) << (i * sub_size)
-   //			asc     := 1.U
-   //		}
-   //
-   //		idx = idx + asc
-   //	}
-   //
-   //	output := tmp.reduce(_|_)
-   //	output
-   //}
+   //yqh 64-16-4
+   def MyEncode(data: UInt): UInt =
+   {
+      val sub_datas = Wire(Vec(4, UInt(16.W)))
+   
+      val this_data = Wire(UInt(64.W))
+      this_data := data
+   
+      for (i <- 0 until 4)
+      {
+   	      sub_datas(i) := (this_data >> (i << 4))(15, 0)
+      }
+   
+      val sign = sub_datas(3)(15).toBool
+      val base = Wire(UInt(16.W))
+   
+      when (sign)
+      {
+          base := (-1.S(16.W)).asUInt
+      }
+      .otherwise
+      {
+          base := 0.U(16.W)
+      }
+   
+      var res = 0.U(4.W)
+      var j   = 0.U(4.W)
+      for (i <- 3 to 1 by -1)
+      {
+          val sub = Wire(init = false.B)
+   	      when (res === j && sub_datas(i) === base && sub_datas(i-1)(15).toBool === sign)
+   	      {
+   	          sub := true.B
+   	      }
+   
+   	      j = j + 1.U
+   	      res = res + sub.asUInt()
+      }
+   
+      4.U-res
+   }
+   
+   def ShiftByMask(data: UInt, mask: UInt): UInt =
+   {
+       val output = Wire(UInt(64.W))
+
+   	   val sub_datas = Wire(Vec(4, UInt(16.W)))
+       val this_data = Wire(UInt(64.W))
+       this_data := data
+
+       for (i <- 0 until 4)
+       {
+   	       sub_datas(i) := (this_data >> (i << 4))(15, 0)
+       }
+   
+   	   val tmp = Wire(Vec(4, UInt(64.W)))
+   	
+	   var idx = 0.U
+   	   for (i <- 0 until 4)
+   	   {
+   	       val asc = Wire(init=0.U)
+   	   	   tmp(i) := 0.U(64.W)
+   	   	   
+		   when (mask(i))
+   	   	   {
+   	   	       tmp(i)  := sub_datas(idx) << (i * 16)
+   	   	   	   asc     := 1.U
+   	   	   }
+   
+   	   	   idx = idx + asc
+   	   }
+   
+   	   output := tmp.reduce(_|_)
+   	   output
+   }
   
    // fp
 
