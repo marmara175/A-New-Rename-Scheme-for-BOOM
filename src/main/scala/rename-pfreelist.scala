@@ -247,10 +247,9 @@ class RenamePFreeListHelper(
 	// set other branch allocation_lists to zero where allocation_list(j) == 1...
 	when (io.br_mispredict_val)
 	{
-	    //printf("mispredict: allocation_list = 0x%x\n", allocation_list)
 		for (i <- 0 until MAX_BR_COUNT)
 		{
-			allocation_lists(i) := allocation_lists(i) & ~allocation_list
+			allocation_lists(i) := (allocation_lists(i) | just_allocation_lists(i).reduce(_|_)) & ~(allocation_list | new_allocation_list)
 		}
 	}
 
@@ -258,22 +257,6 @@ class RenamePFreeListHelper(
 	io.req_pregs := request_pregs
 	io.req_masks := request_masks
 	io.can_allocate := allocated
-
-    //for (i <- 0 until num_write_ports)
-	//{
-	//   val idx = i.asUInt()
-	//   when (io.req_preg_vals(i))
-	//   {
-    //      printf ("req_preg_vals(%d) = b%b, req_part_nums(%d) = d%d, can_allocate(%d) = b%b, req_pregs(%d) = d%d, req_masks(%d) = x%x\n",
-	//      idx, io.req_preg_vals(i), 
-	//	  idx, io.req_part_nums(i), 
-	//	  idx, io.can_allocate(i), 
-	//	  idx, io.req_pregs(i), 
-	//	  idx, io.req_masks(i))
-
-	//	  printf ("freelist = x%x\n", freelist)
-	//   }
-    //}
 }
 
 class RenamePFreeList(
