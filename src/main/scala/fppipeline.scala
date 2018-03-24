@@ -218,7 +218,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    // **** Alloc Pregs ********
    //-------------------------------------------------------------
 
-   io.fp_alloc_pregs(0).valid := ll_wbarb.io.out.valid
+   io.fp_alloc_pregs(0).valid := ll_wbarb.io.out.valid && !io.flush_pipeline
    io.fp_alloc_pregs(0).vreg  := ll_wbarb.io.out.bits.uop.vdst
    io.fp_alloc_pregs(0).nums  := 4.U
    io.fp_alloc_pregs(0).br_mask := ll_wbarb.io.out.bits.uop.br_mask
@@ -233,11 +233,9 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       for (wbresp <- eu.io.resp)
 	  {
 	     if (!wbresp.bits.writesToIRF && !eu.has_ifpu) {
-            io.fp_alloc_pregs(al_idx).valid :=
-               wbresp.valid &&
-               wbresp.bits.uop.ctrl.rf_wen
-            io.fp_alloc_pregs(al_idx).vreg := wbresp.bits.uop.vdst
-            io.fp_alloc_pregs(al_idx).nums := 4.U
+            io.fp_alloc_pregs(al_idx).valid := wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && !io.flush_pipeline
+            io.fp_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
+            io.fp_alloc_pregs(al_idx).nums  := 4.U
 			io.fp_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
 
 			can_alloc(al_idx) := io.fp_alloc_pregs(al_idx).can_alloc 

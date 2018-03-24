@@ -537,7 +537,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       if (exe_units(i).is_mem_unit)
 	  {
 	     //要写回的
-	     rename_stage.io.int_alloc_pregs(al_idx).valid := ll_wbarb.io.out.fire() && ll_wbarb.io.out.bits.uop.vdst != UInt(0)
+	     rename_stage.io.int_alloc_pregs(al_idx).valid := ll_wbarb.io.out.fire() && ll_wbarb.io.out.bits.uop.vdst != UInt(0) && !rob.io.flush.valid
 		 rename_stage.io.int_alloc_pregs(al_idx).vreg  := ll_wbarb.io.out.bits.uop.vdst
 		 rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U//MyEncode(ll_wbarb.io.out.bits.data)
 		 rename_stage.io.int_alloc_pregs(al_idx).br_mask := ll_wbarb.io.out.bits.uop.br_mask 
@@ -583,7 +583,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
 			if (exe_units(i).uses_csr_wport && (j == 0))
 			{
-			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0)
+			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0) && !rob.io.flush.valid
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U
 			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
@@ -624,7 +624,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		    }
 			else
 			{
-			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0)
+			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0) && !rob.io.flush.valid
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U
 			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask

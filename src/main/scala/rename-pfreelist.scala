@@ -87,6 +87,8 @@ class RenamePFreeListHelper(
 	val freelist = Reg(init = ~Bits(0, width = num_physical_registers * numIntPhysRegsParts))
 	def free_list(w: Int) = freelist((w+1)*numIntPhysRegsParts-1, w*numIntPhysRegsParts)
 
+	printf("pfreelist = 0x%x\n", freelist)
+
     // track all allocations that have occurred since branch passed by
     // can quickly reset pipeline on branch mispredict
     val allocation_lists = Mem(MAX_BR_COUNT, Bits(width = num_physical_registers * numIntPhysRegsParts))
@@ -338,14 +340,6 @@ class RenamePFreeList(
 	io.can_allocate := pfreelist.io.can_allocate
     io.req_pregs := pfreelist.io.req_pregs 
     io.req_masks := pfreelist.io.req_masks 
-
-	//for (i <- 0 until num_write_ports)
-	//{
-	//    when (io.can_allocate(i) =/= io.req_preg_vals(i))
-	//	{
-	//		printf ("error111: io.can_allocate = b%b, io.req_preg_vals = b%b\n", io.can_allocate(i), io.req_preg_vals(i))
-	//	}
-	//}
 
 	// 目的逻辑寄存器是0，ldst_val等于false
 	// 不会请求分配物理寄存器空间
