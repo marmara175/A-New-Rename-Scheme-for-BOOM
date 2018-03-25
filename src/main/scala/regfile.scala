@@ -100,24 +100,28 @@ class RegisterFileBehavorial(
 
    // mask === all(1) : ext_mask === all(1, register_width)
    // mask =/= all(1) : ext_mask === 对应的子块掩码全1
-   def extend_mask(mask: UInt, mask_size: Int, register_width: Int): UInt =
+   def extend_mask(mask: UInt, register_width: Int): UInt =
    {
       val output = Wire(init = 0.U(register_width.W))
 
-      val sub_width = register_width / mask_size
 	  var e_mask = 0.U(register_width.W)
-
-	  for (i <- 0 until mask_size)
+	  for (i <- 0 until 4)
 	  {
-	     val sub_mask = ((mask(i) << 63.U).asSInt() >> 63.U)(sub_width-1,0)
-		 e_mask = e_mask | sub_mask.asUInt() << (sub_width * i)
+	     val sub_mask = Wire(init = 0.U(16.W))
+
+		 when(mask(i))
+		 {
+		    sub_mask := (-1.S(16.W)).asUInt
+		 }
+
+		 e_mask = e_mask | sub_mask << (i << 4)
 	  }
 
 	  output := e_mask
 
-	  when ((mask === ~0.U(width=mask_size.W)))
+	  when (mask === ~0.U(4.W))
 	  {
-	     output := ~0.U(width=register_width.W)
+	     output := ~0.U(register_width.W)
 	  }
 
 	  output
@@ -171,7 +175,7 @@ class RegisterFileBehavorial(
      
       merged_wport(i).valid     := valid
 	  merged_wport(i).bits.addr := addr
-	  merged_wport(i).bits.data := data | regfile(addr) & ~extend_mask(mask, numIntPhysRegsParts, register_width)
+	  merged_wport(i).bits.data := data | regfile(addr) & ~extend_mask(mask, register_width)
    }
    
    // --------------------------------------------------------------
