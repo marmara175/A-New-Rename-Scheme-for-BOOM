@@ -670,7 +670,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 	  }
    }
 
-   val int_wakeup_rb_state = Wire(Vec(num_irf_write_ports, UInt(2.W)))
+   val int_wakeup_rb_state = Wire(Vec(num_wakeup_ports, UInt(2.W)))
 
    var wu_idx = 0
    var swu_idx = 0
@@ -1162,7 +1162,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    {
       fp_pipeline.io.i2f_rb_state := 2.U
    }
-   fp_pipeline.io.i2f_rb_vdst  := ll_wbarb.io.out.uop.vdst 
+   fp_pipeline.io.i2f_rb_vdst  := ll_wbarb.io.out.bits.uop.vdst 
 
 /*
    val alloc_pdst = Wire(Vec(num_irf_write_ports, UInt(width=TPREG_SZ)))

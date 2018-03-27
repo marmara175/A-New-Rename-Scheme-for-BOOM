@@ -170,10 +170,16 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    }
 
    var my_idx = 0
-   for ( (pdst, mask, state) <- issue_unit.io.wakeup_pdsts zip issue_unit.io.wakeup_masks zip issue_unit.io.wakeup_rb_state) {
+   for ( (pdst, mask) <- issue_unit.io.wakeup_pdsts zip issue_unit.io.wakeup_masks) {
       pdst     := alloc_pdst(my_idx) 
       mask     := alloc_mask(my_idx)
-	  when (can_alloc(my_idx))
+	  my_idx   += 1
+   }
+
+   var my_idx2 = 0
+   for {state <- issue_unit.io.wakeup_rb_state}
+   {
+      when (can_alloc(my_idx2))
 	  {
 	     state := 1.U
 	  }
@@ -181,7 +187,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
 	  {
 	     state := 2.U
 	  }
-	  my_idx   += 1
+	  my_idx2  += 1
    }
 
    issue_unit.io.across_rb_val   := io.i2f_rb_val
@@ -254,7 +260,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    }
    .otherwise
    {
-      io.f2i_rb_state := 1.U
+      io.f2i_rb_state := 2.U
    }
    io.f2i_rb_vdst  := ll_wbarb.io.out.bits.uop.vdst
 

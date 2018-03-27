@@ -114,9 +114,9 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
    updated_lrs1_rtype := slotUop.lrs1_rtype
    updated_lrs2_rtype := slotUop.lrs2_rtype
 
-   val has_dst   = slotUop.uopc.ldst_val
-   val cond_fail = Bool()//异常slow唤醒发生
-   val cond_suc  = Bool()//正常slow唤醒发生
+   val has_dst   = slotUop.ldst_val
+   val cond_fail = Wire(Bool())//异常slow唤醒发生
+   val cond_suc  = Wire(Bool())//正常slow唤醒发生
    cond_fail     := Bool(false)
    cond_suc      := Bool(false)
 
@@ -218,7 +218,8 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
       slotUop.pop3 := updated_pop3
    }
 
-   val cond_ = (iqType === IQT_MEM.litValue) && (slotUop.dst_rtype === RT_FLT)
+   val cond_ = Wire(Bool())
+   cond_ := (iqType.asUInt === IQT_MEM) && (slotUop.dst_rtype === RT_FLT)
 
    when ((slotUop.fu_code === FU_F2I || slotUop.fu_code === FU_I2F || cond_) &&
           io.across_rb_val && (slotUop.vdst === io.across_rb_vdst))
@@ -235,7 +236,7 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
 
    for (i <- 0 until num_slow_wakeup_ports)
    {
-      when ((slotUop.fu_code =/= FU_F2I && slotUop.fu_code =/= FU_I2F) &&
+      when ((slotUop.fu_code =/= FU_F2I && slotUop.fu_code =/= FU_I2F && !cond_) &&
 	         io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vdst)
 	  {
 	     when (io.wakeup_rb_state(i) === UInt(1))
