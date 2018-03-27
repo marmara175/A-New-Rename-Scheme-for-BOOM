@@ -116,6 +116,7 @@ class BusyTable(
 
       val wb_valids             = Vec(num_wb_ports, Bool()).asInput
       val wb_vdsts              = Vec(num_wb_ports, UInt(width=preg_sz)).asInput
+      val wb_state              = Vec(num_wb_ports, UInt(2.W)).asInput
 
       // Outputs
       val values                = Vec(pl_width, new BusyTableOutput()).asOutput

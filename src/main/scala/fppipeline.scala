@@ -104,6 +104,20 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       "\n   Num Wakeup Ports      : " + num_wakeup_ports +
       "\n   Num Bypass Ports      : " + exe_units.num_total_bypass_ports + "\n"
 
+   def get_state(can_alloc: Bool): UInt = 
+   {
+      val state = UInt()
+	  when (can_alloc)
+	  {
+	     state := 1.U
+	  }
+	  .otherwise
+	  {
+	     state := 2.U
+	  }
+
+	  state
+   }
 
    //*************************************************************
    // Issue window logic
@@ -179,14 +193,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    var my_idx2 = 0
    for {state <- issue_unit.io.wakeup_rb_state}
    {
-      when (can_alloc(my_idx2))
-	  {
-	     state := 1.U
-	  }
-	  .otherwise
-	  {
-	     state := 2.U
-	  }
+      state    := get_state(can_alloc(my_idx2))
 	  my_idx2  += 1
    }
 
@@ -367,6 +374,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    io.wakeups(0) <> ll_wbarb.io.out
    ll_wbarb.io.out.ready := Bool(true)
 
+   io.wakeups(0).bits.state := get_state(can_alloc(0))
    io.wakeups(0).bits.uop.pdst := alloc_pdst(0)
    io.wakeups(0).bits.uop.dst_mask := alloc_mask(0)
 
@@ -383,6 +391,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             wport.valid := exe_resp.valid && wb_uop.dst_rtype === RT_FLT
             wport.bits.uop.pdst := alloc_pdst(w_cnt)
 			wport.bits.uop.dst_mask := alloc_mask(w_cnt)
+			wport.bits.state := get_state(can_alloc(w_cnt))
 
             w_cnt += 1
 

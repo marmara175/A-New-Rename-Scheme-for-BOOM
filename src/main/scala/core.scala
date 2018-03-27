@@ -555,20 +555,20 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 }
 		 shift_data(al_idx):= ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))//ll_wbarb.io.out.bits.data
 
-	     //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-	     //{
-         //  printf("1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-	     //  al_idx.asUInt(), can_alloc(al_idx),
-	     //  al_idx.asUInt(), alloc_pdst(al_idx),
-	     //  al_idx.asUInt(), alloc_mask(al_idx))
-         //}
-         //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
-		 //{
-		 //   printf("error1 b%b\n", can_alloc(al_idx))
-		 //}
+	     when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+	     {
+           printf("1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+	       al_idx.asUInt(), can_alloc(al_idx),
+	       al_idx.asUInt(), alloc_pdst(al_idx),
+	       al_idx.asUInt(), alloc_mask(al_idx))
+         }
+         when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		 {
+		    printf("error1 b%b\n", can_alloc(al_idx))
+		 }
 
 		 al_idx += 1
 	  }
@@ -605,22 +605,22 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   
 			   shift_data(al_idx):= ShiftByMask(local_data, alloc_mask(al_idx))//Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
                
-			   //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-         	   //{
-               //  printf("2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
-	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-         	   //  al_idx.asUInt(), can_alloc(al_idx),
-         	   //  al_idx.asUInt(), alloc_pdst(al_idx),
-         	   //  al_idx.asUInt(), alloc_mask(al_idx),
-			   //  wbReadsCSR)
-         	   //}
+			   when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+         	   {
+                 printf("2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
+	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+         	     al_idx.asUInt(), can_alloc(al_idx),
+         	     al_idx.asUInt(), alloc_pdst(al_idx),
+         	     al_idx.asUInt(), alloc_mask(al_idx),
+			     wbReadsCSR)
+         	   }
 
-               //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
-		       //{
-		       //   printf("error1 b%b\n", can_alloc(al_idx))
-		       //}
+               when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		       {
+		          printf("error1 b%b\n", can_alloc(al_idx))
+		       }
 
                //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
 		    }
@@ -646,22 +646,22 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
 			   shift_data(al_idx):= ShiftByMask(wbresp.bits.data, alloc_mask(al_idx))//wbresp.bits.data
 
-               //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-			   //{
+               when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+			   {
 
-               //     printf("3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	           //     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-               //   	al_idx.asUInt(), can_alloc(al_idx),
-               // 	al_idx.asUInt(), alloc_pdst(al_idx),
-               // 	al_idx.asUInt(), alloc_mask(al_idx))
-               //}
+                    printf("3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	                al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+                  	al_idx.asUInt(), can_alloc(al_idx),
+                	al_idx.asUInt(), alloc_pdst(al_idx),
+                	al_idx.asUInt(), alloc_mask(al_idx))
+               }
 
-               //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
-		       //{
-		       //   printf("error1 b%b\n", can_alloc(al_idx))
-		       //}
+               when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		       {
+		          printf("error1 b%b\n", can_alloc(al_idx))
+		       }
 			   //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
 			}
 
@@ -669,8 +669,6 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 }
 	  }
    }
-
-   val int_wakeup_rb_state = Wire(Vec(num_wakeup_ports, UInt(2.W)))
 
    var wu_idx = 0
    var swu_idx = 0
@@ -686,15 +684,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 // yqh
 		 int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		 int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
-
-         when (can_alloc(swu_idx))
-		 {
-		    int_wakeup_rb_state(wu_idx) := 1.U
-		 }
-		 .otherwise
-		 {
-		    int_wakeup_rb_state(wu_idx) := 2.U
-		 }
+         int_wakeups(wu_idx).bits.state := get_state(can_alloc(swu_idx))
 
 		 //when (int_wakeups(wu_idx).valid)
 		 //{
@@ -718,8 +708,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
                                          iss_uops(i).dst_rtype === RT_FIX &&
                                          iss_uops(i).ldst_val
             int_wakeups(wu_idx).bits.uop := iss_uops(i)
-
-            int_wakeup_rb_state(wu_idx)  := 0.U
+            int_wakeups(wu_idx).bits.state := 0.U
 
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
@@ -747,15 +736,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             // yqh
 		    int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		    int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
-
-            when (can_alloc(swu_idx))
-			{
-			   int_wakeup_rb_state(wu_idx) := 1.U
-			}
-			.otherwise
-			{
-			   int_wakeup_rb_state(wu_idx) := 2.U
-			}
+            int_wakeups(wu_idx).bits.state := get_state(can_alloc(swu_idx))
 
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
@@ -904,9 +885,9 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    }
 
    for {iu <- issue_units
-        (state, wakeup) <- iu.io.wakeup_rb_state zip int_wakeup_rb_state
+        (state, wakeup) <- iu.io.wakeup_rb_state zip int_wakeups
    }{
-      state := wakeup
+      state := wakeup.bits.state
    }
 
    for {iu <- issue_units}

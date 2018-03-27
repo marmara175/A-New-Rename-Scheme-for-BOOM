@@ -415,7 +415,8 @@ class RenameStage(
    ibusytable.io.map_table := ren2_imapvalues
    ibusytable.io.wb_valids := io.int_wakeups.map(_.valid)
    ibusytable.io.wb_vdsts := io.int_wakeups.map(_.bits.uop.vdst)
-   
+   ibusytable.io.wb_state := io.int_wakeups.map(_.bits.state)
+
    assert (!(io.int_wakeups.map(x => x.valid && x.bits.uop.dst_rtype =/= RT_FIX).reduce(_|_)),
       "[rename] int wakeup is not waking up a Int register.")
 
@@ -438,6 +439,7 @@ class RenameStage(
    fbusytable.io.map_table := ren2_fmapvalues
    fbusytable.io.wb_valids := io.fp_wakeups.map(_.valid)
    fbusytable.io.wb_vdsts := io.fp_wakeups.map(_.bits.uop.vdst)
+   fbusytable.io.wb_state := io.fp_wakeups.map(_.bits.state)
 
    assert (!(io.fp_wakeups.map(x => x.valid && x.bits.uop.dst_rtype =/= RT_FLT).reduce(_|_)),
       "[rename] fp wakeup is not waking up a FP register.")
