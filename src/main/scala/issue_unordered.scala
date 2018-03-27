@@ -34,6 +34,12 @@ class IssueUnitStatic(
       issue_slots(i).wakeup_vdsts := io.wakeup_vdsts
       issue_slots(i).wakeup_pdsts := io.wakeup_pdsts
       issue_slots(i).wakeup_masks := io.wakeup_masks
+      issue_slots(i).wakeup_rb_state := io.wakeup_rb_state
+
+	  issue_slots(i).across_rb_val   := io.across_rb_val
+	  issue_slots(i).across_rb_state := io.across_rb_state
+	  issue_slots(i).across_rb_vdst  := io.across_rb_vdst
+
       issue_slots(i).brinfo       := io.brinfo
       issue_slots(i).kill         := io.flush_pipeline
       issue_slots(i).clear        := Bool(false)

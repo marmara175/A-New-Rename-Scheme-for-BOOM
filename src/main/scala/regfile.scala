@@ -37,11 +37,11 @@ class RegisterFileWritePort(addr_width: Int, data_width: Int)(implicit p: Parame
 // utility function to turn ExeUnitResps to match the regfile's WritePort I/Os.
 object WritePort
 {
-   def apply(enq: DecoupledIO[ExeUnitResp], addr_width: Int, data_width: Int)
+   def apply(enq: DecoupledIO[ExeUnitResp], addr_width: Int, data_width: Int, can_alloc: Bool)
    (implicit p: Parameters): DecoupledIO[RegisterFileWritePort] =
    {
       val wport = Wire(Decoupled(new RegisterFileWritePort(addr_width, data_width)))
-      wport.valid := enq.valid
+      wport.valid := enq.valid && can_alloc
       wport.bits.addr := enq.bits.uop.vdst // yangqinghong
       wport.bits.mask := enq.bits.uop.dst_mask
       wport.bits.data := enq.bits.data
@@ -175,7 +175,7 @@ class RegisterFileBehavorial(
      
       merged_wport(i).valid     := valid
 	  merged_wport(i).bits.addr := addr
-	  merged_wport(i).bits.data := data | regfile(addr) & ~extend_mask(mask, register_width)
+	  merged_wport(i).bits.data := (data & extend_mask(mask, register_width)) | (regfile(addr) & ~extend_mask(mask, register_width))
    }
    
    // --------------------------------------------------------------

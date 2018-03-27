@@ -31,6 +31,11 @@ class IssueSlotIO(num_wakeup_ports: Int)(implicit p: Parameters) extends BoomBun
    val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width = TPREG_SZ))).flip
    val wakeup_pdsts   = Vec(num_wakeup_ports, UInt(width = TPREG_SZ)).asInput
    val wakeup_masks   = Vec(num_wakeup_ports, UInt(width = numIntPhysRegsParts)).asInput
+   val wakeup_rb_state= Vec(num_wakeup_ports, UInt(2.W)).asInput
+
+   val across_rb_val  = Bool().asInput
+   val across_rb_state= UInt(2.W).asInput
+   val across_rb_vdst = UInt(width = TPREG_SZ).asInput
 
    val in_uop         = Valid(new MicroOp()).flip // if valid, this WILL overwrite an entry!
    val updated_uop    = new MicroOp().asOutput // the updated slot uop; will be shifted upwards in a collasping queue.
@@ -48,7 +53,7 @@ class IssueSlotIO(num_wakeup_ports: Int)(implicit p: Parameters) extends BoomBun
    override def cloneType = new IssueSlotIO(num_wakeup_ports)(p).asInstanceOf[this.type]
 }
 
-class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends BoomModule()(p)
+class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Parameters) extends BoomModule()(p)
 {
    val io = new IssueSlotIO(num_slow_wakeup_ports)
 
@@ -109,11 +114,34 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    updated_lrs1_rtype := slotUop.lrs1_rtype
    updated_lrs2_rtype := slotUop.lrs2_rtype
 
+   val has_dst   = slotUop.uopc.ldst_val
+   val cond_fail = Bool()//异常slow唤醒发生
+   val cond_suc  = Bool()//正常slow唤醒发生
+   cond_fail     := Bool(false)
+   cond_suc      := Bool(false)
+
    when (io.kill ||
-         (io.grant && (slot_state === s_valid_1)) ||
-         (io.grant && (slot_state === s_valid_2) && slot_p1 && slot_p2))
+        (io.grant && (slot_state === s_valid_1) && !has_dst) ||
+        (io.grant && (slot_state === s_valid_2) && slot_p1 && slot_p2 && !has_dst) ||
+		(slot_state === s_pending) && cond_suc)
    {
       updated_state := s_invalid
+   }
+   .elsewhen ((io.grant && (slot_state === s_valid_1) && has_dst) ||
+              (io.grant && (slot_state === s_valid_2) && has_dst))
+   {
+      updated_state := s_pending
+   }
+   .elsewhen ((slot_state === s_pending) && cond_fail)
+   {
+      when (slotUop.uopc === uopAMO_AG)
+	  {
+	     updated_state := s_valid_2
+	  }
+	  .otherwise
+	  {
+	     updated_state := s_valid_1
+	  }
    }
    .elsewhen (io.grant && (slot_state === s_valid_2))
    {
@@ -156,9 +184,9 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    val updated_mask1	= Wire(UInt())
    val updated_mask2 	= Wire(UInt())
    val updated_mask3    = Wire(UInt())
-   val updated_pop1	= Wire(UInt())
-   val updated_pop2	= Wire(UInt())
-   val updated_pop3	= Wire(UInt())
+   val updated_pop1	    = Wire(UInt())
+   val updated_pop2	    = Wire(UInt())
+   val updated_pop3	    = Wire(UInt())
 
    updated_mask1 := slotUop.rs1_mask 
    updated_mask2 := slotUop.rs2_mask
@@ -169,9 +197,9 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
 
    when (io.in_uop.valid)
    {
-      next_p1 := !(io.in_uop.bits.prs_busy(0))// || io.in_uop.bits.rs1_mask != UInt(0)
-	  next_p2 := !(io.in_uop.bits.prs_busy(1))// || io.in_uop.bits.rs2_mask != UInt(0)
-	  next_p3 := !(io.in_uop.bits.prs_busy(2))// || io.in_uop.bits.rs3_mask != UInt(0)
+      next_p1 := !(io.in_uop.bits.prs_busy(0))
+	  next_p2 := !(io.in_uop.bits.prs_busy(1))
+	  next_p3 := !(io.in_uop.bits.prs_busy(2))
 
 	  // yqh debug2
       slotUop.pdst := UInt(0)
@@ -190,31 +218,76 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
       slotUop.pop3 := updated_pop3
    }
 
+   val cond_ = (iqType === IQT_MEM.litValue) && (slotUop.dst_rtype === RT_FLT)
+
+   when ((slotUop.fu_code === FU_F2I || slotUop.fu_code === FU_I2F || cond_) &&
+          io.across_rb_val && (slotUop.vdst === io.across_rb_vdst))
+   {
+      when (io.across_rb_state === UInt(1))
+	  {
+	     cond_suc  := Bool(true)
+	  }
+	  .elsewhen (io.across_rb_state === UInt(2))
+	  {
+	     cond_fail  := Bool(true)
+	  }
+   }
+
    for (i <- 0 until num_slow_wakeup_ports)
    {
+      when ((slotUop.fu_code =/= FU_F2I && slotUop.fu_code =/= FU_I2F) &&
+	         io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vdst)
+	  {
+	     when (io.wakeup_rb_state(i) === UInt(1))
+		 {
+		    cond_suc  := Bool(true)
+		 }
+		 .elsewhen (io.wakeup_rb_state(i) === UInt(2))
+		 {
+		    cond_fail := Bool(true)
+		 }
+	  }
+
       when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop1)
       {
-         out_p1        := Bool(true)
-         updated_mask1 := io.wakeup_masks(i)
-         updated_pop1  := io.wakeup_pdsts(i)
-
-		 //printf("yqh wakeup mask1 = 0x%x, updated_pop1 = d%d, vop1 = d%d\n", updated_mask1, updated_pop1, slotUop.vop1)
+	     when (io.wakeup_rb_state(i) =/= UInt(2))
+		 {
+		    out_p1        := Bool(true)
+			updated_mask1 := io.wakeup_masks(i)
+			updated_pop1  := io.wakeup_pdsts(i)
+		 }
+		 .elsewhen (slotUop.lrs1_rtype =/= RT_X)
+		 {
+		    out_p1        := Bool(false) 
+		 }
       }
+
       when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop2)
       {
-         out_p2        := Bool(true)
-         updated_mask2 := io.wakeup_masks(i)
-         updated_pop2  := io.wakeup_pdsts(i)
-		 
-		 //printf("yqh wakeup mask2 = 0x%x, updated_pop2 = d%d, vop2 = d%d\n", updated_mask2, updated_pop2, slotUop.vop2)
+	     when (io.wakeup_rb_state(i) =/= UInt(2))
+		 {
+		    out_p2        := Bool(true)
+			updated_mask2 := io.wakeup_masks(i)
+			updated_pop2  := io.wakeup_pdsts(i)
+		 }
+		 .elsewhen (slotUop.lrs2_rtype =/= RT_X)
+		 {
+		    out_p2        := Bool(false)
+		 }
       }
+
       when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop3)
       {
-         out_p3 := Bool(true)
-         updated_mask3 := io.wakeup_masks(i)
-         updated_pop3  := io.wakeup_pdsts(i)
-
-		 //printf("yqh wakeup mask3 = 0x%x, updated_pop3 = d%d, vop3 = d%d\n", updated_mask3, updated_pop3, slotUop.vop3)
+	     when (io.wakeup_rb_state(i) =/= UInt(2))
+		 {
+		    out_p3        := Bool(true)
+			updated_mask3 := io.wakeup_masks(i)
+			updated_pop3  := io.wakeup_pdsts(i)
+		 }
+		 .elsewhen (slotUop.frs3_en)
+		 {
+		    out_p3        := Bool(false)
+		 }
       }
    }
 
@@ -236,7 +309,7 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
 
    //-------------------------------------------------------------
    // Request Logic
-   io.request := isValid && slot_p1 && slot_p2 && slot_p3 && !io.kill
+   io.request := ((slot_state === s_valid_1) || (slot_state === s_valid_2)) && slot_p1 && slot_p2 && slot_p3 && !io.kill
    val high_priority = slotUop.is_br_or_jmp
 //   io.request_hp := io.request && high_priority
    io.request_hp := Bool(false)
@@ -258,8 +331,8 @@ class IssueSlot(num_slow_wakeup_ports: Int)(implicit p: Parameters) extends Boom
    //assign outputs
    io.valid         := isValid
    io.uop           := slotUop
-   io.will_be_valid := isValid &&
-                       !(io.grant && ((slot_state === s_valid_1) || (slot_state === s_valid_2) && slot_p1 && slot_p2))
+   io.will_be_valid := isValid && !((slot_state === s_pending) && cond_suc ||
+					     io.grant && ((slot_state === s_valid_1) || (slot_state === s_valid_2) && slot_p1 && slot_p2))
 
    io.updated_uop           := slotUop
    io.updated_uop.iw_state  := updated_state

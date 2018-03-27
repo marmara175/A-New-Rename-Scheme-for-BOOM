@@ -670,6 +670,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 	  }
    }
 
+   val int_wakeup_rb_state = Wire(Vec(num_irf_write_ports, UInt(2.W)))
+
    var wu_idx = 0
    var swu_idx = 0
    // loop through each issue-port (exe_units are statically connected to an issue-port)
@@ -684,6 +686,15 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 // yqh
 		 int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		 int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
+
+         when (can_alloc(swu_idx))
+		 {
+		    int_wakeup_rb_state(wu_idx) := 1.U
+		 }
+		 .otherwise
+		 {
+		    int_wakeup_rb_state(wu_idx) := 2.U
+		 }
 
 		 //when (int_wakeups(wu_idx).valid)
 		 //{
@@ -708,8 +719,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
                                          iss_uops(i).ldst_val
             int_wakeups(wu_idx).bits.uop := iss_uops(i)
 
-			//int_wakeups(wu_idx).bits.uop.pdst := iss_uops(i).vdst//yangqinghong
-			//int_wakeups(wu_idx).bits.uop.dst_mask := "b1111".U//yangqinghong 
+            int_wakeup_rb_state(wu_idx)  := 0.U
 
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
@@ -737,7 +747,16 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             // yqh
 		    int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		    int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
-   
+
+            when (can_alloc(swu_idx))
+			{
+			   int_wakeup_rb_state(wu_idx) := 1.U
+			}
+			.otherwise
+			{
+			   int_wakeup_rb_state(wu_idx) := 2.U
+			}
+
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
 		    //	printf("wakeup 2222: valid(%d) = b%b, vdst(%d) = d%d, pdst(%d) = d%d, dst_mask(%d) = d%d\n", 
@@ -800,8 +819,6 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       when (dis_uops(w).uopc === uopSTA && dis_uops(w).lrs2_rtype === RT_FLT) {
          iu.io.dis_uops(w).lrs2_rtype := RT_X
 		 iu.io.dis_uops(w).prs_busy := dis_uops(w).prs_busy & "b101".U
-		 // yqh
-         // iu.io.dis_uops(w).rs2_mask := ~Bits(0, width = numIntPhysRegsParts)
       }
    }
 
@@ -885,6 +902,20 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       mask    := wakeup.bits.uop.dst_mask
 	  //printf ("core.wakeup: issport.dst_mask = d%d\n", mask)
    }
+
+   for {iu <- issue_units
+        (state, wakeup) <- iu.io.wakeup_rb_state zip int_wakeup_rb_state
+   }{
+      state := wakeup
+   }
+
+   for {iu <- issue_units}
+   {
+      iu.io.across_rb_val   := fp_pipeline.io.f2i_rb_val 
+	  iu.io.across_rb_state := fp_pipeline.io.f2i_rb_state
+	  iu.io.across_rb_vdst  := fp_pipeline.io.f2i_rb_vdst
+   }
+
    //-------------------------------------------------------------
    //-------------------------------------------------------------
    // **** Register Read Stage ****
@@ -1043,11 +1074,10 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 val wbpdst = alloc_pdst(w_cnt)
 		 val wbmask = alloc_mask(w_cnt)
 		 val wbdata = shift_data(w_cnt)
-		 //yangqinghong
-		 val wbvdst = wbresp.bits.uop.vdst
+		 val walloc = can_alloc(w_cnt)
 
          def wbIsValid(rtype: UInt) =
-            wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && wbresp.bits.uop.dst_rtype === rtype
+            wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && wbresp.bits.uop.dst_rtype === rtype && walloc
          val wbReadsCSR = wbresp.bits.uop.ctrl.csr_cmd =/= rocket.CSR.N
 
          if (exe_units(i).data_width > 64)
@@ -1117,11 +1147,22 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
    ll_wbarb.io.in(1) <> fp_pipeline.io.toint
-   iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, TPREG_SZ, xLen)
+   iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, TPREG_SZ, xLen, can_alloc(llidx))
    //yqh
    iregfile.io.write_ports(llidx).bits.addr := alloc_pdst(llidx) // yangqinghong 1
    iregfile.io.write_ports(llidx).bits.mask := alloc_mask(llidx)
    iregfile.io.write_ports(llidx).bits.data := shift_data(llidx)
+
+   fp_pipeline.io.i2f_rb_val   := ll_wbarb.io.out.valid && !can_alloc(llidx)
+   when (can_alloc(llidx))
+   {
+      fp_pipeline.io.i2f_rb_state := 1.U
+   }
+   .otherwise
+   {
+      fp_pipeline.io.i2f_rb_state := 2.U
+   }
+   fp_pipeline.io.i2f_rb_vdst  := ll_wbarb.io.out.uop.vdst 
 
 /*
    val alloc_pdst = Wire(Vec(num_irf_write_ports, UInt(width=TPREG_SZ)))

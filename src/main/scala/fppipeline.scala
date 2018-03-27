@@ -47,6 +47,14 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       val wb_valids        = Vec(num_wakeup_ports, Bool()).asInput
       val wb_vdsts         = Vec(num_wakeup_ports, UInt(width=fp_vreg_sz)).asInput
 
+      val i2f_rb_val       = Bool().asInput
+      val i2f_rb_state     = UInt(2.W).asInput
+	  val i2f_rb_vdst      = UInt(width=TPREG_SZ).asInput
+
+      val f2i_rb_val       = Bool().asOutput
+	  val f2i_rb_state     = UInt(2.W).asOutput
+	  val f2i_rb_vdst      = UInt(width=TPREG_SZ).asOutput
+
       val fp_alloc_pregs   = Vec(num_wakeup_ports, new AllocToRenameIO(TPREG_SZ, TPREG_SZ, numIntPhysRegsParts)).flip
 
       //TODO -- hook up commit log stuff.
@@ -162,11 +170,23 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    }
 
    var my_idx = 0
-   for ( (pdst, mask) <- issue_unit.io.wakeup_pdsts zip issue_unit.io.wakeup_masks) {
+   for ( (pdst, mask, state) <- issue_unit.io.wakeup_pdsts zip issue_unit.io.wakeup_masks zip issue_unit.io.wakeup_rb_state) {
       pdst     := alloc_pdst(my_idx) 
       mask     := alloc_mask(my_idx)
+	  when (can_alloc(my_idx))
+	  {
+	     state := 1.U
+	  }
+	  .otherwise
+	  {
+	     state := 2.U
+	  }
 	  my_idx   += 1
    }
+
+   issue_unit.io.across_rb_val   := io.i2f_rb_val
+   issue_unit.io.across_rb_state := io.i2f_rb_state
+   issue_unit.io.across_rb_vdst  := io.i2f_rb_vdst
 
    //-------------------------------------------------------------
    // **** Register Read Stage ****
@@ -227,6 +247,17 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    alloc_mask(0):= io.fp_alloc_pregs(0).mask
    //require( !ll_wbarb.io.out.fire() || can_alloc(0))
 
+   io.f2i_rb_val   := io.fp_alloc_pregs(0).valid && !can_alloc(0)
+   when (can_alloc(0))
+   {
+      io.f2i_rb_state := 1.U
+   }
+   .otherwise
+   {
+      io.f2i_rb_state := 1.U
+   }
+   io.f2i_rb_vdst  := ll_wbarb.io.out.bits.uop.vdst
+
    var al_idx = 1
    for (eu <- exe_units)
    {
@@ -268,11 +299,11 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       // Wakeup signal is sent on cycle S0, write is now delayed until end of S1,
       // but Issue happens on S1 and RegRead doesn't happen until S2 so we're safe.
       // (for regreadlatency >0).
-      fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), TPREG_SZ, fLen+1)
+      fregfile.io.write_ports(0) <> WritePort(RegNext(ll_wbarb.io.out), TPREG_SZ, fLen+1, RegNext(can_alloc(0)))
 	  fregfile.io.write_ports(0).bits.mask := RegNext(alloc_mask(0))
 	  fregfile.io.write_ports(0).bits.addr := RegNext(alloc_pdst(0)) //yangqinghong 1
    } else {
-      fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, TPREG_SZ, fLen+1)
+      fregfile.io.write_ports(0) <> WritePort(ll_wbarb.io.out, TPREG_SZ, fLen+1, can_alloc(0))
 	  fregfile.io.write_ports(0).bits.mask := alloc_mask(0)
 	  fregfile.io.write_ports(0).bits.addr := alloc_pdst(0) //yangqinghong 1
    }
@@ -297,9 +328,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             // share with ll unit
          } else {
             assert (!(wbresp.valid && toint))
-            fregfile.io.write_ports(w_cnt).valid :=
-               wbresp.valid &&
-               wbresp.bits.uop.ctrl.rf_wen
+            fregfile.io.write_ports(w_cnt).valid := wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && can_alloc(w_cnt)
             fregfile.io.write_ports(w_cnt).bits.addr := alloc_pdst(w_cnt)//wbresp.bits.uop.vdst//yangqinghong 1
             fregfile.io.write_ports(w_cnt).bits.mask := alloc_mask(w_cnt)//wbresp.bits.uop.dst_mask
             fregfile.io.write_ports(w_cnt).bits.data := wbresp.bits.data

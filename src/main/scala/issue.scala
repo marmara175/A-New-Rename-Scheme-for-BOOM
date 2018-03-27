@@ -37,6 +37,11 @@ class IssueUnitIO(issue_width: Int, num_wakeup_ports: Int)(implicit p: Parameter
    val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width=TPREG_SZ))).flip
    val wakeup_pdsts   = Vec(num_wakeup_ports, UInt(width=TPREG_SZ)).asInput
    val wakeup_masks   = Vec(num_wakeup_ports, UInt(width=numIntPhysRegsParts)).asInput
+   val wakeup_rb_state= Vec(num_wakeup_ports, UInt(2.W)).asInput
+
+   val across_rb_val  = Bool(INPUT)
+   val across_rb_state= UInt(2.W).asInput
+   val across_rb_vdst = UInt(width = TPREG_SZ).asInput
 
    // tell the issue unit what each execution pipeline has in terms of functional units
    val fu_types       = Vec(issue_width, Bits(width=FUC_SZ)).asInput
@@ -77,7 +82,7 @@ abstract class IssueUnit(
    //-------------------------------------------------------------
    // Issue Table
 
-   val issue_slots = Vec.fill(num_issue_slots) {Module(new IssueSlot(num_wakeup_ports)).io}
+   val issue_slots = Vec.fill(num_issue_slots) {Module(new IssueSlot(num_wakeup_ports, iqType)).io}
 
    io.event_empty := !(issue_slots.map(s => s.valid).reduce(_|_))
 
