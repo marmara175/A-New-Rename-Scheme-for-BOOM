@@ -102,6 +102,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    // Used to wakeup registers in rename and issue. ROB needs to listen to something else.
    val int_wakeups      = Wire(Vec(num_wakeup_ports, Valid(new ExeUnitResp(xLen))))
 
+   val rob_head         = rob.io.rob_head
+
    require (exe_units.length == issue_units.map(_.issue_width).sum)
 
    //***********************************
@@ -518,12 +520,14 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
   
    // fp
 
+   fp_pipeline.io.rob_head := rob_head
    for (i <- 0 until fp_pipeline.io.wakeups.length)
    {
       rename_stage.io.fp_alloc_pregs(i).valid := fp_pipeline.io.fp_alloc_pregs(i).valid
       rename_stage.io.fp_alloc_pregs(i).vreg  := fp_pipeline.io.fp_alloc_pregs(i).vreg
       rename_stage.io.fp_alloc_pregs(i).nums  := fp_pipeline.io.fp_alloc_pregs(i).nums
-      rename_stage.io.fp_alloc_pregs(i).br_mask  := fp_pipeline.io.fp_alloc_pregs(i).br_mask 
+      rename_stage.io.fp_alloc_pregs(i).br_mask  := fp_pipeline.io.fp_alloc_pregs(i).br_mask
+	  rename_stage.io.fp_alloc_pregs(i).is_rob_head := fp_pipeline.io.fp_alloc_pregs(i).is_rob_head
 	  fp_pipeline.io.fp_alloc_pregs(i).can_alloc := rename_stage.io.fp_alloc_pregs(i).can_alloc
       fp_pipeline.io.fp_alloc_pregs(i).preg   := rename_stage.io.fp_alloc_pregs(i).preg
       fp_pipeline.io.fp_alloc_pregs(i).mask   := rename_stage.io.fp_alloc_pregs(i).mask
@@ -557,6 +561,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 rename_stage.io.int_alloc_pregs(al_idx).vreg  := ll_wbarb.io.out.bits.uop.vdst
 		 rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(ll_wbarb.io.out.bits.data)//4.U
 		 rename_stage.io.int_alloc_pregs(al_idx).br_mask := ll_wbarb.io.out.bits.uop.br_mask 
+		 rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx === rob_head)
+
 		 when (ll_wbarb.io.out.bits.uop.vdst != UInt(0))
 		 {
 		    alloc_mask(al_idx):= rename_stage.io.int_alloc_pregs(al_idx).mask
@@ -605,6 +611,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(local_data)//4.U
 			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
+               rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx === rob_head)
 
 		       when (wbresp.bits.uop.vdst != UInt(0))
 		       {
@@ -646,6 +653,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(wbresp.bits.data)//4.U
 			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask
+			   rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx === rob_head)
+
 
 		       when (wbresp.bits.uop.vdst != UInt(0))
 		       {
@@ -664,7 +673,6 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
                when (rename_stage.io.int_alloc_pregs(al_idx).valid)
 			   {
-
                     printf("3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
 	                al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
 	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,

@@ -78,6 +78,8 @@ class RobIo(machine_width: Int,
    // (some loads can only execute once they are at the head of the ROB).
    val com_load_is_at_rob_head = Bool(OUTPUT)
 
+   val rob_head = UInt(OUTPUT, log2Up(NUM_ROB_ROWS))
+
    // Communicate exceptions to the CSRFile
    val com_xcpt = Valid(new CommitExceptionSignals(machine_width))
    val csr_eret = Bool(INPUT)
@@ -918,6 +920,7 @@ class Rob(width: Int,
    }
 
    io.com_load_is_at_rob_head := rob_head_is_load(PriorityEncoder(rob_head_vals.toBits))
+   io.rob_head := rob_head
 
    //--------------------------------------------------
    // Handle passing out signals to printf in dpath

@@ -17,6 +17,7 @@ class PFreeListIO(
     private val preg_sz		= log2Up(num_physical_registers)
     private val part_num_sz	= log2Up(numIntPhysRegsParts) + 1
 
+    val req_is_rob_head     = Vec(num_write_ports, Bool()).asInput
     val req_preg_vals 		= Vec(num_write_ports, Bool()).asInput
     val req_part_nums		= Vec(num_write_ports, UInt(width=part_num_sz)).asInput
     val req_br_mask 		= Vec(num_write_ports, UInt(width = MAX_BR_COUNT)).asInput
@@ -87,6 +88,16 @@ class RenamePFreeListHelper(
 	val freelist = Reg(init = ~Bits(0, width = num_physical_registers * numIntPhysRegsParts))
 	def free_list(w: Int) = freelist((w+1)*numIntPhysRegsParts-1, w*numIntPhysRegsParts)
 
+    // yangqinghong new
+    val freelist_use = Wire(Vec(num_physical_registers, Bool()))
+
+    for (i <- 0 until num_physical_registers)
+	{
+	   freelist_use(i) := free_list(i) =/= UInt(0)
+	}
+
+    var count = PopCount(freelist_use.toBits)
+
 	printf("pfreelist = 0x%x\n", freelist)
 
     // track all allocations that have occurred since branch passed by
@@ -120,7 +131,7 @@ class RenamePFreeListHelper(
 			val alloc_nums = Wire(init = UInt(0, width=numIntPhysRegsParts))
 			val alloc_mask = Wire(init = Bits(0, width=numIntPhysRegsParts))
 
-	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums)
+	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums && (io.req_is_rob_head(req_idx) || count >= 5.U))
 	    	{
 				next_request_pregs(req_idx)     := preg_idx.asUInt()
 				next_request_masks(req_idx)     := alloc_parts(idle_mask, nums)
@@ -277,6 +288,7 @@ class RenamePFreeList(
 		val ren_br_vals		= Vec(pl_width, Bool()).asInput //当前指令有效，并且是分支指令
     	
 		// request allocate physical register
+		val req_is_rob_head = Vec(num_write_ports, Bool()).asInput
     	val req_preg_vals   = Vec(num_write_ports, Bool()).asInput
 		val req_part_nums   = Vec(num_write_ports, UInt(width=part_num_sz)).asInput
 		val req_br_mask     = Vec(num_write_ports, UInt(width = MAX_BR_COUNT)).asInput
@@ -315,7 +327,8 @@ class RenamePFreeList(
         pfreelist.io.ren_br_vals(w) := io.ren_br_vals(w)
         pfreelist.io.ren_br_tags(w) := io.ren_uops(w).br_tag
     }
-
+    
+	pfreelist.io.req_is_rob_head := io.req_is_rob_head
     pfreelist.io.req_preg_vals := io.req_preg_vals
     pfreelist.io.req_part_nums := io.req_part_nums
 	pfreelist.io.req_br_mask   := io.req_br_mask

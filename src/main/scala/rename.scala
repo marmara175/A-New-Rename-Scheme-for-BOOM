@@ -32,6 +32,8 @@ class AllocToRenameIO(
    val vreg      = UInt(INPUT, width=vreg_sz)
    val nums      = UInt(INPUT, width=mask_sz)
    val br_mask   = UInt(INPUT, width=MAX_BR_COUNT)
+   val is_rob_head = Bool(INPUT)   
+
    val can_alloc = Bool(OUTPUT)
    val preg      = UInt(OUTPUT, width=preg_sz)
    val mask      = UInt(OUTPUT, width=mask_sz)
@@ -335,7 +337,7 @@ class RenameStage(
    for (w <- 0 until num_myint_wb_ports)
    { 
        i_v2p_maptable.io.allocpregs_valids(w)	:= i_pfreelist.io.can_allocate(w)// | io.int_alloc_pregs(w).valid // yangqinghong
-       i_v2p_maptable.io.allocpregs_vregs(w)	:= io.int_alloc_pregs(w).vreg
+	   i_v2p_maptable.io.allocpregs_vregs(w)	:= io.int_alloc_pregs(w).vreg
        i_v2p_maptable.io.allocpregs_pregs(w)	:= i_pfreelist.io.req_pregs(w)
        i_v2p_maptable.io.allocpregs_masks(w)	:= i_pfreelist.io.req_masks(w)
    }
@@ -368,6 +370,7 @@ class RenameStage(
 
    for (w <- 0 until num_myint_wb_ports) {
        i_pfreelist.io.req_preg_vals(w)      := io.int_alloc_pregs(w).valid
+	   i_pfreelist.io.req_is_rob_head(w)    := io.int_alloc_pregs(w).is_rob_head
        i_pfreelist.io.req_part_nums(w)      := io.int_alloc_pregs(w).nums
 	   i_pfreelist.io.req_br_mask(w)        := io.int_alloc_pregs(w).br_mask
        io.int_alloc_pregs(w).can_alloc      := i_pfreelist.io.can_allocate(w)// | io.int_alloc_pregs(w).valid //yangqinghong
@@ -394,6 +397,7 @@ class RenameStage(
        f_pfreelist.io.req_preg_vals(w)      := io.fp_alloc_pregs(w).valid
        f_pfreelist.io.req_part_nums(w)      := io.fp_alloc_pregs(w).nums
 	   f_pfreelist.io.req_br_mask(w)        := io.fp_alloc_pregs(w).br_mask
+	   f_pfreelist.io.req_is_rob_head(w)    := io.fp_alloc_pregs(w).is_rob_head
        io.fp_alloc_pregs(w).can_alloc       := f_pfreelist.io.can_allocate(w)// | io.fp_alloc_pregs(w).valid //yangqinghong
        io.fp_alloc_pregs(w).preg            := f_pfreelist.io.req_pregs(w)
        io.fp_alloc_pregs(w).mask            := f_pfreelist.io.req_masks(w)

@@ -43,6 +43,8 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       val tosdq            = Valid(new MicroOpWithData(fLen))    // to Load/Store Unit
       val toint            = Decoupled(new ExeUnitResp(xLen))    // to integer RF
 
+      val rob_head         = UInt(INPUT, log2Up(NUM_ROB_ROWS))
+
       val wakeups          = Vec(num_wakeup_ports, Valid(new ExeUnitResp(fLen+1)))
       val wb_valids        = Vec(num_wakeup_ports, Bool()).asInput
       val wb_vdsts         = Vec(num_wakeup_ports, UInt(width=fp_vreg_sz)).asInput
@@ -255,6 +257,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    io.fp_alloc_pregs(0).vreg  := ll_wbarb.io.out.bits.uop.vdst
    io.fp_alloc_pregs(0).nums  := 4.U
    io.fp_alloc_pregs(0).br_mask := ll_wbarb.io.out.bits.uop.br_mask
+   io.fp_alloc_pregs(0).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx === io.rob_head)
    can_alloc(0) := io.fp_alloc_pregs(0).can_alloc
    alloc_pdst(0):= io.fp_alloc_pregs(0).preg
    alloc_mask(0):= io.fp_alloc_pregs(0).mask
@@ -281,7 +284,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             io.fp_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
             io.fp_alloc_pregs(al_idx).nums  := 4.U
 			io.fp_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
-
+            io.fp_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx === io.rob_head) 
 			can_alloc(al_idx) := io.fp_alloc_pregs(al_idx).can_alloc 
 			alloc_pdst(al_idx):= io.fp_alloc_pregs(al_idx).preg
 			alloc_mask(al_idx):= io.fp_alloc_pregs(al_idx).mask
