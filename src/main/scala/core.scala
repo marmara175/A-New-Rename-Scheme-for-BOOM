@@ -424,6 +424,22 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    rename_stage.io.dec_will_fire := dec_will_fire
    rename_stage.io.dec_uops := dec_uops
 
+   def get_state(can_alloc: Bool): UInt = 
+   {
+      val state = Wire(UInt(2.W))
+
+	  when (can_alloc)
+	  {
+	     state := 1.U
+	  }
+	  .otherwise
+	  {
+	     state := 2.U
+	  }
+
+	  state
+   }
+
    //yqh 64-16-4
    def MyEncode(data: UInt): UInt =
    {

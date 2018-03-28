@@ -27,6 +27,7 @@ import uncore.constants.MemoryOpConstants._
 // TODO rename to something like MicroOpWithData
 class ExeUnitResp(data_width: Int)(implicit p: Parameters) extends BoomBundle()(p)
 {
+   val state = UInt(2.W)
    val uop = new MicroOp()
    val data = Bits(width = data_width)
    val fflags = new ValidIO(new FFlagsResp) // write fflags to ROB

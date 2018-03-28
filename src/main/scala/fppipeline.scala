@@ -106,7 +106,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
 
    def get_state(can_alloc: Bool): UInt = 
    {
-      val state = UInt()
+      val state = Wire(UInt(2.W))
 	  when (can_alloc)
 	  {
 	     state := 1.U

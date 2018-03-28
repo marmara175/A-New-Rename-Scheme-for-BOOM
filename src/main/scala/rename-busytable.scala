@@ -16,6 +16,15 @@ import config.Parameters
 
 // internally bypasses newly busy registers (.write) to the read ports (.read)
 // num_operands is the maximum number of operands per instruction (.e.g., 2 normally, but 3 if FMAs are supported)
+class WakeupUnBusy(preg_sz: Int) extends Bundle
+{
+   val valid = Bool()
+   val vdst  = UInt(width = preg_sz)
+   val state = UInt(2.W)
+
+   override def cloneType: this.type = new WakeupUnBusy(preg_sz).asInstanceOf[this.type]
+}
+
 class BusyTableIo(
    pipeline_width:Int,
    num_pregs: Int,
@@ -36,7 +45,8 @@ class BusyTableIo(
    val allocated_vdst = Vec(pipeline_width, new ValidIO(UInt(width=preg_sz))).flip
 
    // marking registers being written back as unbusy
-   val unbusy_vdst    = Vec(num_wb_ports, new ValidIO(UInt(width = preg_sz))).flip
+   val unbusy_vdst    = Vec(num_wb_ports, new WakeupUnBusy(preg_sz)).asInput
+   //val unbusy_state   = Vec(num_wb_ports, UInt(2.W))
 
    val debug = new Bundle { val busytable= Bits(width=num_pregs).asOutput }
 }
@@ -62,10 +72,14 @@ class BusyTableHelper(
 
    for (wb_idx <- 0 until num_wb_ports)
    {
-      when (io.unbusy_vdst(wb_idx).valid)
+      when (io.unbusy_vdst(wb_idx).valid && (io.unbusy_vdst(wb_idx).state =/= UInt(2)))
       {
-         table_bsy(io.unbusy_vdst(wb_idx).bits) := NOT_BUSY
+         table_bsy(io.unbusy_vdst(wb_idx).vdst) := NOT_BUSY
       }
+	  .elsewhen (io.unbusy_vdst(wb_idx).valid && (io.unbusy_vdst(wb_idx).state === UInt(2)))
+	  {
+	     table_bsy(io.unbusy_vdst(wb_idx).vdst) := BUSY
+	  }
    }
 
    for (w <- 0 until pipeline_width)
@@ -79,9 +93,10 @@ class BusyTableHelper(
    // handle bypassing a clearing of the busy-bit
    for (ridx <- 0 until num_read_ports)
    {
-      val just_cleared = io.unbusy_vdst.map(p => p.valid && (p.bits === io.p_rs(ridx))).reduce(_|_)
+      val just_cleared = io.unbusy_vdst.map(p => p.valid && (p.vdst === io.p_rs(ridx)) && (p.state =/= UInt(2))).reduce(_|_)
+	  val just_seted   = io.unbusy_vdst.map(p => p.valid && (p.vdst === io.p_rs(ridx)) && (p.state === UInt(2))).reduce(_|_)
       // note: no bypassing of the newly busied (that is done outside this module)
-      io.p_rs_busy(ridx) := (table_bsy(io.p_rs(ridx)) && !just_cleared)
+      io.p_rs_busy(ridx) := (table_bsy(io.p_rs(ridx)) && !just_cleared) || just_seted
    }
 
    io.debug.busytable := table_bsy.toBits
@@ -184,7 +199,8 @@ class BusyTable(
    for (i <- 0 until num_wb_ports)
    {
       busy_table.io.unbusy_vdst(i).valid := io.wb_valids(i)
-      busy_table.io.unbusy_vdst(i).bits  := io.wb_vdsts(i)
+      busy_table.io.unbusy_vdst(i).vdst  := io.wb_vdsts(i)
+	  busy_table.io.unbusy_vdst(i).state := io.wb_state(i)
    }
 
    // scalastyle:on
