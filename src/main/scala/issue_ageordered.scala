@@ -138,7 +138,7 @@ class IssueUnitCollasping(
       {
          val can_allocate = (issue_slots(i).uop.fu_code & io.fu_types(w)) =/= UInt(0)
 
-         when (requests(i) && !uop_issued && can_allocate && !port_issued(w))
+         when (requests(i) && !uop_issued && can_allocate && !port_issued(w) && io.iss_readys(w))
          {
             issue_slots(i).grant := Bool(true)
             io.iss_valids(w) := Bool(true)

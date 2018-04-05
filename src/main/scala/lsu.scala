@@ -68,6 +68,10 @@ class LoadStoreUnitIO(pl_width: Int)(implicit p: Parameters) extends BoomBundle(
    val exe_resp           = (new ValidIO(new FuncUnitResp(xLen))).flip
    val fp_stdata          = Valid(new MicroOpWithData(fLen)).flip
 
+   // yqh debug load
+   val rob_head           = UInt(INPUT, log2Up(NUM_ROB_ROWS))
+   val ready_for_load_wk  = Bool(OUTPUT)
+
    // Commit Stage
    val commit_store_mask  = Vec(pl_width, Bool()).asInput
    val commit_load_mask   = Vec(pl_width, Bool()).asInput
@@ -141,6 +145,8 @@ class LoadStoreUnitIO(pl_width: Int)(implicit p: Parameters) extends BoomBundle(
 class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends BoomModule()(p)
 {
    val io = new LoadStoreUnitIO(pl_width)
+
+   //printf("io.rob_head = d%d\n", io.rob_head)
 
    val num_ld_entries = NUM_LSU_ENTRIES
    val num_st_entries = NUM_LSU_ENTRIES
@@ -418,6 +424,30 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
    val exe_ld_idx_wakeup = RegNext(
       AgePriorityEncoder((0 until num_ld_entries).map(i => laq_addr_val(i) & ~laq_executed(i)), laq_head))
 
+   // yqh debug load
+   // exe_ld_idx_wakeup
+   // laq_addr_val(exe_ld_idx_wakeup)
+   // ~laq_executed(exe_ld_idx_wakeup)
+   // laq_uop(exe_ld_idx_wakeup).rob_idx / 2.U === io.rob_head
+
+   val is_rob_head = (laq_uop(exe_ld_idx_wakeup).rob_idx / 2.U) === io.rob_head
+   when(laq_addr_val(exe_ld_idx_wakeup) && ~laq_executed(exe_ld_idx_wakeup) && is_rob_head)
+   {
+      io.ready_for_load_wk := Bool(false)
+   }
+   .otherwise
+   {
+      io.ready_for_load_wk := Bool(true)
+   }
+
+   printf ("laq_addr_val(exe_ld_idx_wakeup) = b%b, ~laq_executed(exe_ld_idx_wakeup) = b%b, is_rob_head = b%b, laq_uop(exe_ld_idx_wakeup).rob_idx = d%d, rob_head = d%d, io.ready_for_load_wk = d%d\n",
+   laq_addr_val(exe_ld_idx_wakeup),
+   ~laq_executed(exe_ld_idx_wakeup),
+   is_rob_head,
+   laq_uop(exe_ld_idx_wakeup).rob_idx,
+   io.rob_head,
+   io.ready_for_load_wk
+   )
 
    when (laq_addr_val       (exe_ld_idx_wakeup) &&
          !laq_is_virtual    (exe_ld_idx_wakeup) &&
@@ -521,7 +551,7 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
       laq_failure (exe_ld_uop.ldq_idx) := (will_fire_load_incoming && (ma_ld || pf_ld)) ||
                                           (will_fire_load_retry && pf_ld)
    }
-
+   //printf("will_fire_store_commit=%d, will_fire_load_incoming=%d, will_fire_load_retry=%d, will_fire_load_wakeup=%d,exe_ld_uop.ldq_idx=%d\n",will_fire_store_commit,will_fire_load_incoming,will_fire_load_retry,will_fire_load_wakeup,exe_ld_uop.ldq_idx);
    assert (PopCount(Vec(will_fire_store_commit, will_fire_load_incoming, will_fire_load_retry, will_fire_load_wakeup))
       <= UInt(1), "Multiple requestors firing to the data cache.")
 
@@ -537,13 +567,14 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
       laq_addr          (exe_tlb_uop.ldq_idx)      := Mux(tlb_miss, exe_vaddr, exe_tlb_paddr)
       laq_uop           (exe_tlb_uop.ldq_idx).vdst := exe_tlb_uop.vdst
 	  //yqh
+	  laq_uop           (exe_tlb_uop.ldq_idx).rob_idx := exe_tlb_uop.rob_idx
       laq_uop           (exe_tlb_uop.ldq_idx).pdst := exe_tlb_uop.pdst
       laq_uop           (exe_tlb_uop.ldq_idx).dst_mask := exe_tlb_uop.dst_mask
       laq_is_virtual    (exe_tlb_uop.ldq_idx)      := tlb_miss
       laq_is_uncacheable(exe_tlb_uop.ldq_idx)      := tlb_addr_uncacheable && !tlb_miss
 
-      assertNever(will_fire_load_incoming && laq_addr_val(exe_tlb_uop.ldq_idx),
-         "[lsu] incoming load is overwriting a valid address.")
+      //assertNever(will_fire_load_incoming && laq_addr_val(exe_tlb_uop.ldq_idx),
+      //   "[lsu] incoming load is overwriting a valid address.")
    }
 
    when (will_fire_sta_incoming || will_fire_sta_retry)
@@ -796,6 +827,19 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
                          (mem_fired_ld && ldld_addr_conflict) ||
                          mem_ld_killed ||
                          (mem_fired_st && io.nack.valid && !io.nack.isload)
+   printf ("io.memreq_kill = b%b, mem_ld_used_tlb = b%b, mem_tlb_miss = b%b, Reg(next=pf_ld || ma_ld) = b%b, mem_fired_ld = b%b, ldst_addr_conflicts.toBits =/= UInt(0) = b%b, ldld_addr_conflict = b%b, mem_ld_killed = b%b, mem_fired_st = b%b, io.nack.valid = b%b, io.nack.isload = b%b\n",            
+            io.memreq_kill,
+			mem_ld_used_tlb,
+			mem_tlb_miss,
+			Reg(next=pf_ld || ma_ld),
+			mem_fired_ld,
+			ldst_addr_conflicts.toBits =/= UInt(0),
+			ldld_addr_conflict,
+			mem_ld_killed,
+			mem_fired_st,
+			io.nack.valid,
+			io.nack.isload)
+
    wb_forward_std_idx := forwarding_age_logic.io.forwarding_idx
 
    // kill forwarding if branch mispredict
@@ -1297,7 +1341,8 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
    io.counters.stld_order_fail := RegNext(stld_order_fail)
    io.counters.ldld_order_fail := RegNext(ldld_order_fail)
 
-   if (DEBUG_PRINTF_LSU)
+   if (true)
+   //if (DEBUG_PRINTF_LSU)
    {
       printf("wakeup_idx: %d, ld is head of ROB:%d\n", exe_ld_idx_wakeup, io.commit_load_at_rob_head)
       for (i <- 0 until NUM_LSU_ENTRIES)

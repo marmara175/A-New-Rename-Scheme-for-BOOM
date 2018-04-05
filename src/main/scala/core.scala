@@ -104,6 +104,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
    val rob_head         = rob.io.rob_head
 
+
    require (exe_units.length == issue_units.map(_.issue_width).sum)
 
    //***********************************
@@ -122,6 +123,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
    // Issue Stage/Register Read
    val iss_valids     = Wire(Vec(exe_units.length, Bool()))
+   val iss_readys     = Wire(Vec(exe_units.length, Bool()))
    val iss_uops       = Wire(Vec(exe_units.length, new MicroOp()))
    val bypasses       = Wire(new BypassData(exe_units.num_total_bypass_ports, xLen))
 
@@ -561,7 +563,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 rename_stage.io.int_alloc_pregs(al_idx).vreg  := ll_wbarb.io.out.bits.uop.vdst
 		 rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(ll_wbarb.io.out.bits.data)//4.U
 		 rename_stage.io.int_alloc_pregs(al_idx).br_mask := ll_wbarb.io.out.bits.uop.br_mask 
-		 rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx === rob_head)
+		 rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx/2.U === rob_head)
 
 		 when (ll_wbarb.io.out.bits.uop.vdst != UInt(0))
 		 {
@@ -577,20 +579,22 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 }
 		 shift_data(al_idx):= ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))//ll_wbarb.io.out.bits.data
 
-	     when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+	     //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
 	     {
-           printf("1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+           printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	       ll_wbarb.io.out.bits.uop.pc(31,0), rob_head, ll_wbarb.io.out.bits.uop.rob_idx,
+		   al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
 	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
 	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+		   al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
 	       al_idx.asUInt(), can_alloc(al_idx),
 	       al_idx.asUInt(), alloc_pdst(al_idx),
 	       al_idx.asUInt(), alloc_mask(al_idx))
          }
-         when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
-		 {
-		    printf("error1 b%b\n", can_alloc(al_idx))
-		 }
+         //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		 //{
+		 //   printf("error1 b%b\n", can_alloc(al_idx))
+		 //}
 
 		 al_idx += 1
 	  }
@@ -611,7 +615,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(local_data)//4.U
 			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
-               rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx === rob_head)
+               rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx/2.U === rob_head)
 
 		       when (wbresp.bits.uop.vdst != UInt(0))
 		       {
@@ -628,22 +632,24 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   
 			   shift_data(al_idx):= ShiftByMask(local_data, alloc_mask(al_idx))//Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
                
-			   when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+			   //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
          	   {
-                 printf("2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
-	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+                 printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
+	             wbresp.bits.uop.pc(31,0), rob_head, wbresp.bits.uop.rob_idx,
+			     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
 	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
 	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+			     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
          	     al_idx.asUInt(), can_alloc(al_idx),
          	     al_idx.asUInt(), alloc_pdst(al_idx),
          	     al_idx.asUInt(), alloc_mask(al_idx),
 			     wbReadsCSR)
          	   }
 
-               when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
-		       {
-		          printf("error1 b%b\n", can_alloc(al_idx))
-		       }
+               //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		       //{
+		       //   printf("error1 b%b\n", can_alloc(al_idx))
+		       //}
 
                //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
 		    }
@@ -653,7 +659,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
 			   rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(wbresp.bits.data)//4.U
 			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask
-			   rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx === rob_head)
+			   rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx/2.U === rob_head)
 
 
 		       when (wbresp.bits.uop.vdst != UInt(0))
@@ -671,21 +677,23 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
 			   shift_data(al_idx):= ShiftByMask(wbresp.bits.data, alloc_mask(al_idx))//wbresp.bits.data
 
-               when (rename_stage.io.int_alloc_pregs(al_idx).valid)
+               //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
 			   {
-                    printf("3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	                al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+                    printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	                wbresp.bits.uop.pc(31,0),rob_head, wbresp.bits.uop.rob_idx, 
+			    	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
 	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
 	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+			    	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
                   	al_idx.asUInt(), can_alloc(al_idx),
                 	al_idx.asUInt(), alloc_pdst(al_idx),
                 	al_idx.asUInt(), alloc_mask(al_idx))
                }
 
-               when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
-		       {
-		          printf("error1 b%b\n", can_alloc(al_idx))
-		       }
+               //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
+		       //{
+		       //   printf("error1 b%b\n", can_alloc(al_idx))
+		       //}
 			   //require( !wbIsValid(RT_FIX) || can_alloc(al_idx))
 			}
 
@@ -761,6 +769,14 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		    int_wakeups(wu_idx).bits.uop.pdst := alloc_pdst(swu_idx)
 		    int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
             int_wakeups(wu_idx).bits.state := get_state(can_alloc(swu_idx))
+
+            printf ("valid = %d, int_wakeups(wu_idx).bits.uop.vdst = %d, int_wakeups(wu_idx).bits.state = %d, resp.valid = %d, resp.bits.uop.ctrl.rf_wen = %d, resp.bits.uop.dst_rtype === RT_FIX = %d\n", 
+			         resp.valid && resp.bits.uop.ctrl.rf_wen && resp.bits.uop.dst_rtype === RT_FIX,
+					 int_wakeups(wu_idx).bits.uop.vdst,
+					 int_wakeups(wu_idx).bits.state,
+					 resp.valid,
+					 resp.bits.uop.ctrl.rf_wen,
+					 resp.bits.uop.dst_rtype === RT_FIX)
 
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
@@ -841,6 +857,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    {
       iss_valids(w) := issue_units(iss_idx).io.iss_valids(iss_cnt)
       iss_uops(w)   := issue_units(iss_idx).io.iss_uops(iss_cnt)
+	  issue_units(iss_idx).io.iss_readys(iss_cnt) := iss_readys(w)
 
       var fu_types = exe_units(w).io.fu_types
 
@@ -912,6 +929,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
         (state, wakeup) <- iu.io.wakeup_rb_state zip int_wakeups
    }{
       state := wakeup.bits.state
+	  printf ("state = %d, wakeup.bits.state = %d", state, wakeup.bits.state)
    }
 
    for {iu <- issue_units}
@@ -931,6 +949,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    iregister_read.io.rf_read_ports <> iregfile.io.read_ports
 
    iregister_read.io.iss_valids <> iss_valids
+   iss_readys <> iregister_read.io.iss_readys
    iregister_read.io.iss_uops := iss_uops
 
    iregister_read.io.brinfo := br_unit.brinfo
@@ -1003,6 +1022,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    }
    require (idx == exe_units.num_total_bypass_ports)
 
+   printf("mem req: pc = 0x%x\n", exe_units(0).io.req.bits.uop.pc(31, 0))
+
 
    // don't send IntToFP moves to integer execution units.
    when (iregister_read.io.exe_reqs(ifpu_idx).bits.uop.fu_code === FUConstants.FU_I2F) {
@@ -1038,6 +1059,10 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    lsu.io.commit_store_mask := rob.io.commit.st_mask
    lsu.io.commit_load_mask  := rob.io.commit.ld_mask
    lsu.io.commit_load_at_rob_head := rob.io.com_load_is_at_rob_head
+   lsu.io.rob_head := rob_head
+
+   // qyh debug
+   //printf("lsu.io.rob_head = d%d, rob_head = d%d\n", lsu.io.rob_head, rob_head)
 
    //com_xcpt.valid comes too early, will fight against a branch that resolves same cycle as an exception
    lsu.io.exception := rob.io.flush.valid
@@ -1150,6 +1175,14 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    ll_wbarb.io.in(0).valid := mem_resp.valid && mem_resp.bits.uop.ctrl.rf_wen && mem_resp.bits.uop.dst_rtype === RT_FIX
    ll_wbarb.io.in(0).bits  := mem_resp.bits
 
+   printf("mem resp: pc = 0x%x\n", mem_resp.bits.uop.pc(31,0))
+   printf("ll_wbarb_in: pc = 0x%x, valid = b%b, rf_wen = b%b, FIX = b%b\n", 
+           ll_wbarb.io.in(0).bits.uop.pc(31,0),
+		   mem_resp.valid,
+		   mem_resp.bits.uop.ctrl.rf_wen,
+		   mem_resp.bits.uop.dst_rtype === RT_FIX)
+   printf("ll_wbarb_out: pc = 0x%x, valid = b%b\n", ll_wbarb.io.out.bits.uop.pc(31,0), ll_wbarb.io.out.valid)
+
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
    ll_wbarb.io.in(1) <> fp_pipeline.io.toint
    iregfile.io.write_ports(llidx) <> WritePort(ll_wbarb.io.out, TPREG_SZ, xLen, can_alloc(llidx))
@@ -1199,22 +1232,23 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    {
       for ((resp, j) <- eu.io.resp.zipWithIndex)
       {
+	     val alloc_err = rename_stage.io.int_alloc_pregs(cnt).valid && !can_alloc(cnt)
          val wb_uop = resp.bits.uop
 
          if (eu.is_mem_unit)
          {
             val ll_uop = ll_wbarb.io.out.bits.uop
-            rob.io.wb_resps(cnt).valid := ll_wbarb.io.out.valid && !(ll_uop.is_store && !ll_uop.is_amo)
+            rob.io.wb_resps(cnt).valid := ll_wbarb.io.out.valid && !(ll_uop.is_store && !ll_uop.is_amo) && !alloc_err
             rob.io.wb_resps(cnt).bits <> ll_wbarb.io.out.bits
          }
          else
          {
-            rob.io.wb_resps(cnt).valid := resp.valid && !(wb_uop.is_store && !wb_uop.is_amo)
+            rob.io.wb_resps(cnt).valid := resp.valid && !(wb_uop.is_store && !wb_uop.is_amo) && !alloc_err
             rob.io.wb_resps(cnt).bits <> resp.bits
          }
 
          // for commit logging...
-         rob.io.debug_wb_valids(cnt) := resp.valid &&
+         rob.io.debug_wb_valids(cnt) := resp.valid && !alloc_err &&
                                         wb_uop.ctrl.rf_wen &&
                                         (wb_uop.dst_rtype === RT_FIX || wb_uop.dst_rtype === RT_FLT)
 
@@ -1255,9 +1289,10 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       }
    }
 
-   for (wakeup <- fp_pipeline.io.wakeups)
+   for ((wakeup, alloc_err) <- fp_pipeline.io.wakeups zip fp_pipeline.io.alloc_err)
    {
       rob.io.wb_resps(cnt) <> wakeup
+	  rob.io.wb_resps(cnt).valid := wakeup.valid && alloc_err
       rob.io.fflags(f_cnt) <> wakeup.bits.fflags
       rob.io.debug_wb_valids(cnt) := Bool(false) // TODO XXX add back commit logging for FP instructions.
       cnt += 1

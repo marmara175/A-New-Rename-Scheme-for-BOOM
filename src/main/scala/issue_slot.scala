@@ -46,6 +46,7 @@ class IssueSlotIO(num_wakeup_ports: Int)(implicit p: Parameters) extends BoomBun
        val p1 = Bool()
        val p2 = Bool()
        val p3 = Bool()
+	   val state = UInt(3.W)
     }
     result.asOutput
   }
@@ -236,6 +237,12 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
 
    for (i <- 0 until num_slow_wakeup_ports)
    {
+    //  printf ("cond = %d, io.wakeup_vdsts(i).valid = %d, io.wakeup_vdsts(i).bits = %d, io.wakeup_rb_state(i) = %d\n",
+	  //        ((slotUop.fu_code =/= FU_F2I && slotUop.fu_code =/= FU_I2F && !cond_) && io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vdst).asUInt,
+		//	  io.wakeup_vdsts(i).valid,
+		//	  io.wakeup_vdsts(i).bits,
+		//	  io.wakeup_rb_state(i))
+
       when ((slotUop.fu_code =/= FU_F2I && slotUop.fu_code =/= FU_I2F && !cond_) &&
 	         io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vdst)
 	  {
@@ -247,6 +254,10 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
 		 {
 		    cond_fail := Bool(true)
 		 }
+		 printf ("io.wakeup_vdsts(i).bits = %d, io.wakeup_rb_state(i) = %d, cond_fail = %d\n",
+		          io.wakeup_vdsts(i).bits,
+				  io.wakeup_rb_state(i),
+				  cond_fail)
 	  }
 
       when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop1)
@@ -333,7 +344,7 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
    io.valid         := isValid
    io.uop           := slotUop
    io.will_be_valid := isValid && !((slot_state === s_pending) && cond_suc ||
-					     io.grant && ((slot_state === s_valid_1) || (slot_state === s_valid_2) && slot_p1 && slot_p2))
+					     io.grant && !has_dst && ((slot_state === s_valid_1) || (slot_state === s_valid_2) && slot_p1 && slot_p2))
 
    io.updated_uop           := slotUop
    io.updated_uop.iw_state  := updated_state
@@ -374,5 +385,6 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
    io.debug.p1 := slot_p1
    io.debug.p2 := slot_p2
    io.debug.p3 := slot_p3
+   io.debug.state := slot_state
 }
 

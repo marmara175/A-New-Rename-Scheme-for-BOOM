@@ -34,6 +34,8 @@ class IssueUnitIO(issue_width: Int, num_wakeup_ports: Int)(implicit p: Parameter
 
    val iss_valids     = Vec(issue_width, Bool()).asOutput
    val iss_uops       = Vec(issue_width, new MicroOp().asOutput)
+   val iss_readys     = Vec(issue_width, Bool()).asInput
+
    val wakeup_vdsts   = Vec(num_wakeup_ports, Valid(UInt(width=TPREG_SZ))).flip
    val wakeup_pdsts   = Vec(num_wakeup_ports, UInt(width=TPREG_SZ)).asInput
    val wakeup_masks   = Vec(num_wakeup_ports, UInt(width=numIntPhysRegsParts)).asInput
@@ -84,6 +86,13 @@ abstract class IssueUnit(
 
    val issue_slots = Vec.fill(num_issue_slots) {Module(new IssueSlot(num_wakeup_ports, iqType)).io}
 
+   for (i <- 0 until num_wakeup_ports)
+   {
+      printf ("io.wakeup_rb_state(%d) = %d, io.wakeup_vdsts = %d\n", 
+	           i.asUInt, io.wakeup_rb_state(i), io.wakeup_vdsts(i).bits)
+   }
+   //printf ("issue_slot(0).rob_idx = d%d, issue_slot(0).state = d%d\n", issue_slots(0).uop.rob_idx, issue_slots(0).debug.state)
+
    io.event_empty := !(issue_slots.map(s => s.valid).reduce(_|_))
 
    //-------------------------------------------------------------
@@ -106,8 +115,8 @@ abstract class IssueUnit(
       }
    }
 
-   if (DEBUG_PRINTF)
-   //if (true)
+   //if (DEBUG_PRINTF)
+   if (true)
    {
       val typ_str = if (iqType == IQT_INT.litValue) "int"
                     else if (iqType == IQT_MEM.litValue) "mem"
@@ -116,7 +125,7 @@ abstract class IssueUnit(
       for (i <- 0 until num_issue_slots)
       {
          printf("  " + typ_str + "_issue_slot[%d](%c)(Req:%c):wen=%c P:(%c,%c,%c) VALID_OP:(%b, %b, %b) VOP:(%d,%d,%d) POP:(%d,%d,%d) RS_MASK:(%x, %x, %x) PDST:%d VDST:%d DST_MASK:%x %c [[DASM(%x)]" +
-               " 0x%x: %d] ri:%d bm=%d imm=0x%x\n"
+               " 0x%x: %d] ri:%d bm=%d imm=0x%x state = d%d rob_idx=%d\n"
             , UInt(i, log2Up(num_issue_slots))
             , Mux(issue_slots(i).valid, Str("V"), Str("-"))
             , Mux(issue_slots(i).request, Str("R"), Str("-"))
@@ -149,6 +158,8 @@ abstract class IssueUnit(
             , issue_slots(i).uop.rob_idx
             , issue_slots(i).uop.br_mask
             , issue_slots(i).uop.imm_packed
+			, issue_slots(i).debug.state
+			, issue_slots(i).uop.rob_idx
             )
 	  }
 

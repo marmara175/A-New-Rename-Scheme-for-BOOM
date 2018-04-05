@@ -131,7 +131,7 @@ class IssueUnitStatic(
       {
          val can_allocate = (issue_slots(i).uop.fu_code & io.fu_types(w)) =/= Bits(0)
 
-         when (hi_request_not_satisfied(i) && can_allocate && !port_issued)
+         when (hi_request_not_satisfied(i) && can_allocate && !port_issued && io.iss_readys(w))
          {
             issue_slots(i).grant := Bool(true)
             io.iss_valids(w)     := Bool(true)
@@ -151,7 +151,7 @@ class IssueUnitStatic(
       {
          val can_allocate = (issue_slots(i).uop.fu_code & io.fu_types(w)) =/= Bits(0)
 
-         when (lo_request_not_satisfied(i) && can_allocate && !port_issued)
+         when (lo_request_not_satisfied(i) && can_allocate && !port_issued && io.iss_readys(w))
          {
             issue_slots(i).grant := Bool(true)
             io.iss_valids(w)     := Bool(true)

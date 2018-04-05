@@ -75,7 +75,7 @@ class RenameVFreeListHelper(
    // ** FREE LIST TABLE ** //
    val free_list = Reg(init=(~Bits(1,num_virtual_registers)))
 
-   printf("vfreelist = b%b\n", free_list)
+   //printf("vfreelist = b%b\n", free_list)
 
    // track all allocations that have occurred since branch passed by
    // can quickly reset pipeline on branch mispredict

@@ -46,8 +46,9 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       val rob_head         = UInt(INPUT, log2Up(NUM_ROB_ROWS))
 
       val wakeups          = Vec(num_wakeup_ports, Valid(new ExeUnitResp(fLen+1)))
-      val wb_valids        = Vec(num_wakeup_ports, Bool()).asInput
-      val wb_vdsts         = Vec(num_wakeup_ports, UInt(width=fp_vreg_sz)).asInput
+      //val wb_valids      = Vec(num_wakeup_ports, Bool()).asInput
+      //val wb_vdsts       = Vec(num_wakeup_ports, UInt(width=fp_vreg_sz)).asInput
+      val alloc_err        = Vec(num_wakeup_ports, Bool())
 
       val i2f_rb_val       = Bool().asInput
       val i2f_rb_state     = UInt(2.W).asInput
@@ -126,6 +127,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
 
    val iss_valids     = Wire(Vec(exe_units.withFilter(_.uses_iss_unit).map(x=>x).length, Bool()))
    val iss_uops       = Wire(Vec(exe_units.withFilter(_.uses_iss_unit).map(x=>x).length, new MicroOp()))
+   val iss_readys     = Wire(Vec(exe_units.withFilter(_.uses_iss_unit).map(x=>x).length, Bool()))
 
    issue_unit.io.tsc_reg := io.debug_tsc_reg
    issue_unit.io.brinfo := io.brinfo
@@ -166,6 +168,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    {
       iss_valids(i) := issue_unit.io.iss_valids(i)
       iss_uops(i) := issue_unit.io.iss_uops(i)
+      issue_unit.io.iss_readys(i) := iss_readys(i)
 
       var fu_types = exe_units(i).io.fu_types
       if (exe_units(i).supportedFuncUnits.fdiv && regreadLatency > 0)
@@ -211,6 +214,7 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    fregister_read.io.rf_read_ports <> fregfile.io.read_ports
 
    fregister_read.io.iss_valids <> iss_valids
+   iss_readys <> fregister_read.io.iss_readys
    fregister_read.io.iss_uops := iss_uops
 
    fregister_read.io.brinfo := io.brinfo
@@ -257,21 +261,15 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    io.fp_alloc_pregs(0).vreg  := ll_wbarb.io.out.bits.uop.vdst
    io.fp_alloc_pregs(0).nums  := 4.U
    io.fp_alloc_pregs(0).br_mask := ll_wbarb.io.out.bits.uop.br_mask
-   io.fp_alloc_pregs(0).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx === io.rob_head)
+   io.fp_alloc_pregs(0).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx/2.U === io.rob_head)
    can_alloc(0) := io.fp_alloc_pregs(0).can_alloc
    alloc_pdst(0):= io.fp_alloc_pregs(0).preg
    alloc_mask(0):= io.fp_alloc_pregs(0).mask
+   io.alloc_err(0) := io.fp_alloc_pregs(0).valid && !can_alloc(0)
    //require( !ll_wbarb.io.out.fire() || can_alloc(0))
 
    io.f2i_rb_val   := io.fp_alloc_pregs(0).valid && !can_alloc(0)
-   when (can_alloc(0))
-   {
-      io.f2i_rb_state := 1.U
-   }
-   .otherwise
-   {
-      io.f2i_rb_state := 2.U
-   }
+   io.f2i_rb_state := get_state(can_alloc(0))
    io.f2i_rb_vdst  := ll_wbarb.io.out.bits.uop.vdst
 
    var al_idx = 1
@@ -284,10 +282,11 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             io.fp_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
             io.fp_alloc_pregs(al_idx).nums  := 4.U
 			io.fp_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
-            io.fp_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx === io.rob_head) 
+            io.fp_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx/2.U === io.rob_head) 
 			can_alloc(al_idx) := io.fp_alloc_pregs(al_idx).can_alloc 
 			alloc_pdst(al_idx):= io.fp_alloc_pregs(al_idx).preg
 			alloc_mask(al_idx):= io.fp_alloc_pregs(al_idx).mask
+			io.alloc_err(al_idx) := io.fp_alloc_pregs(al_idx).valid && !can_alloc(al_idx)
 			//require(!(wbresp.valid && wbresp.bits.uop.ctrl.rf_wen) || can_alloc(al_idx))
 			al_idx += 1
 		 }

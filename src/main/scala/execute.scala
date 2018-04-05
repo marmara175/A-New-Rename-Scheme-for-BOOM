@@ -92,6 +92,8 @@ abstract class ExecutionUnit(val num_rf_read_ports: Int
 {
    val io = new ExecutionUnitIO(num_rf_read_ports, num_rf_write_ports
                                , num_bypass_stages, data_width)
+   io.req.ready := Bool(true)
+
 
    io.resp.map(_.bits.fflags.valid := Bool(false))
 
@@ -295,7 +297,13 @@ class ALUExeUnit(
       muldiv.io.req.valid           := io.req.valid &&
                                        ((io.req.bits.uop.fu_code_is(FU_DIV) && Bool(has_div)) ||
                                         (io.req.bits.uop.fu_code_is(FU_MUL) && Bool(has_mul && use_slow_mul)))
-      muldiv.io.req.bits.uop        := io.req.bits.uop
+	  muldiv.io.req.bits.uop        := io.req.bits.uop
+	  printf ("*********************req_valid = %d, muldiv.io.req.valid = %d, muldiv.io.req.bits.uop.vdst = %d, muldiv.io.req.bits.kill = %d\n",
+	           io.req.valid,
+			   muldiv.io.req.valid,
+			   muldiv.io.req.bits.uop.vdst,
+			   muldiv.io.req.bits.kill)
+
       muldiv.io.req.bits.rs1_data   := io.req.bits.rs1_data
       muldiv.io.req.bits.rs2_data   := io.req.bits.rs2_data
       muldiv.io.brinfo              := io.brinfo
@@ -303,8 +311,16 @@ class ALUExeUnit(
 
       // share write port with the pipelined units
       muldiv.io.resp.ready := !(fu_units.map(_.io.resp.valid).reduce(_|_))
-
+      
+	  when(muldiv.io.resp.valid && (!muldiv.io.resp.ready)){
+	  		io.req.ready := false.B
+	  }
       muldiv_resp_val := muldiv.io.resp.valid
+	  printf ("****************muldiv.io.resp.valid = %d, muldiv.io.resp.bits.uop.vdst = %d, valids = b%b\n",
+	           muldiv.io.resp.valid,
+			   muldiv.io.resp.bits.uop.vdst,
+			   Vec(fu_units.map(_.io.resp.valid)).asUInt)
+
       muldiv_busy := !muldiv.io.req.ready ||
                      (io.req.valid && (io.req.bits.uop.fu_code_is(FU_DIV) ||
                                       (io.req.bits.uop.fu_code_is(FU_MUL) && Bool(has_mul && use_slow_mul))))
@@ -316,6 +332,7 @@ class ALUExeUnit(
    assert (io.resp(0).ready) // don'yet support back-pressuring this unit.
 
    io.resp(0).valid    := fu_units.map(_.io.resp.valid).reduce(_|_)
+   printf ("********************io.resp(0).valid = %d\n", io.resp(0).valid)
    io.resp(0).bits.uop := new MicroOp().fromBits(
                            PriorityMux(fu_units.map(f => (f.io.resp.valid, f.io.resp.bits.uop.toBits))))
    io.resp(0).bits.data:= PriorityMux(fu_units.map(f => (f.io.resp.valid, f.io.resp.bits.data.toBits))).toBits
@@ -540,6 +557,11 @@ class MemExeUnit(implicit p: Parameters) extends ExecutionUnit(num_rf_read_ports
    val maddrcalc = Module(new MemAddrCalcUnit())
    maddrcalc.io.req <> io.req
 
+   io.req.ready := io.lsu_io.ready_for_load_wk
+   //printf ("11111111:io.lsu_io.ready_for_load_wk = b%b\n", io.lsu_io.ready_for_load_wk)
+   //yqh debug load
+   //io.lsu_io.ready_for_load_wk
+
    maddrcalc.io.brinfo <> io.brinfo
    io.bypass <> maddrcalc.io.bypass  // TODO this is not where the bypassing should occur from, is there any bypassing happening?!
 
@@ -558,12 +580,33 @@ class MemExeUnit(implicit p: Parameters) extends ExecutionUnit(num_rf_read_ports
    io.dmem.req.bits.uop   := io.lsu_io.memreq_uop
    io.dmem.req.bits.kill  := io.lsu_io.memreq_kill // load kill request sent to memory
 
+//   printf ("mem_req: io.dmem.req.valid = b%b, io.dmem.req.bits.uop.pc = 0x%x, ldq_idx = d%d, io.dmem.req.bits.kill = b%b, io.lsu_io.memreq_kill=b%b\n",
+//            io.dmem.req.valid,
+//			io.dmem.req.bits.uop.pc(31,0),
+//			io.dmem.req.bits.uop.ldq_idx,
+//			io.dmem.req.bits.kill,
+//			io.lsu_io.memreq_kill)
+
    // I should be timing forwarding to coincide with dmem resps, so I'm not clobbering
    //anything....
    val memresp_val    = Mux(io.com_exception && io.dmem.resp.bits.uop.is_load, Bool(false),
                                                 io.lsu_io.forward_val || io.dmem.resp.valid)
    val memresp_rf_wen = (io.dmem.resp.valid && (io.dmem.resp.bits.uop.mem_cmd === M_XRD || io.dmem.resp.bits.uop.is_amo)) ||  // TODO should I refactor this to use is_load?
                            io.lsu_io.forward_val
+//   printf ("memresp_val = b%b, io.com_exception = b%b, io.dmem.resp.bits.uop.is_load = b%b, io.lsu_io.forward_val = b%b, io.dmem.resp.valid = b%b\n",
+//            memresp_val,
+//			io.com_exception,
+//			io.dmem.resp.bits.uop.is_load,
+//			io.lsu_io.forward_val,
+//			io.dmem.resp.valid)
+
+//   printf ("memresp_rf_wen = b%b, io.dmem.resp.valid = b%b, io.dmem.resp.bits.uop.mem_cmd === M_XRD = b%b, io.dmem.resp.bits.uop.is_amo = b%b, io.lsu_io.forward_val = b%b\n",
+//           memresp_rf_wen,
+//		   io.dmem.resp.valid,
+//		   io.dmem.resp.bits.uop.mem_cmd === M_XRD,
+//		   io.dmem.resp.bits.uop.is_amo,
+//		   io.lsu_io.forward_val)
+
    val memresp_uop    = Mux(io.lsu_io.forward_val, io.lsu_io.forward_uop,
                                                 io.dmem.resp.bits.uop)
 

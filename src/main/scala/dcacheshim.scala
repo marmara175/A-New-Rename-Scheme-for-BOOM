@@ -308,6 +308,17 @@ class DCacheShim(implicit p: Parameters) extends BoomModule()(p)
 
    io.dmem.invalidate_lr  := io.core.invalidate_lr
 
+   printf ("io.core.req.ready = b%b, io.dmem.req.valid = b%b, io.dmem.req.bits.typ = d%d, io.dmem.req.bits.addr = 0x%x, io.dmem.req.bits.tag = 0x%x, io.dmem.req.bits.cmd = d%d, io.dmem.s1_data = 0x%x, io.dmem.s1_kill = b%b, io.dmem.invalidate_lr = b%b\n",
+			io.core.req.ready,
+			io.dmem.req.valid,
+			io.dmem.req.bits.typ,
+			io.dmem.req.bits.addr,
+			io.dmem.req.bits.tag,
+			io.dmem.req.bits.cmd,
+			io.dmem.s1_data,
+			io.dmem.s1_kill,
+			io.dmem.invalidate_lr) 
+
    //------------------------------------------------------------
    // handle responses and nacks
 

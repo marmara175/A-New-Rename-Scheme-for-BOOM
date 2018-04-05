@@ -89,16 +89,16 @@ class RenamePFreeListHelper(
 	def free_list(w: Int) = freelist((w+1)*numIntPhysRegsParts-1, w*numIntPhysRegsParts)
 
     // yangqinghong new
-    val freelist_use = Wire(Vec(num_physical_registers, Bool()))
+    val freelist_free = Wire(Vec(num_physical_registers, Bool()))
 
     for (i <- 0 until num_physical_registers)
 	{
-	   freelist_use(i) := free_list(i) =/= UInt(0)
+	   freelist_free(i) := free_list(i) === ~Bits(0, numIntPhysRegsParts)
 	}
 
-    var count = PopCount(freelist_use.toBits)
+    var count = PopCount(freelist_free.toBits)
 
-	printf("pfreelist = 0x%x\n", freelist)
+	//printf("pfreelist = 0x%x\n", freelist)
 
     // track all allocations that have occurred since branch passed by
     // can quickly reset pipeline on branch mispredict
@@ -130,8 +130,9 @@ class RenamePFreeListHelper(
 
 			val alloc_nums = Wire(init = UInt(0, width=numIntPhysRegsParts))
 			val alloc_mask = Wire(init = Bits(0, width=numIntPhysRegsParts))
-
-	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums && (io.req_is_rob_head(req_idx) || count >= 5.U))
+            val begin = (idle_mask === ~Bits(0, numIntPhysRegsParts))
+			val end   = Wire(init = (begin === Bool(true)))
+	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums && (io.req_is_rob_head(req_idx) || count > 3.U))
 	    	{
 				next_request_pregs(req_idx)     := preg_idx.asUInt()
 				next_request_masks(req_idx)     := alloc_parts(idle_mask, nums)
@@ -139,8 +140,10 @@ class RenamePFreeListHelper(
 
 				alloc_nums                      := nums
 				alloc_mask                      := next_request_masks(req_idx)
+			    end                             := Bool(false) 
 	    	}
-
+            
+			count = count - (begin.asUInt-end.asUInt)
 			idle_size = idle_size - alloc_nums
 			idle_mask = idle_mask & ~alloc_mask
 		}
@@ -149,6 +152,10 @@ class RenamePFreeListHelper(
 		request_pregs   = next_request_pregs
 		request_masks   = next_request_masks
     }
+
+   
+    //printf("req_is_rob_head = b%b, count = d%d\n", io.req_is_rob_head.toBits, count)
+
 
 	var req_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)
 	var enq_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)
