@@ -86,11 +86,11 @@ abstract class IssueUnit(
 
    val issue_slots = Vec.fill(num_issue_slots) {Module(new IssueSlot(num_wakeup_ports, iqType)).io}
 
-   for (i <- 0 until num_wakeup_ports)
-   {
-      printf ("io.wakeup_rb_state(%d) = %d, io.wakeup_vdsts = %d\n", 
-	           i.asUInt, io.wakeup_rb_state(i), io.wakeup_vdsts(i).bits)
-   }
+   //for (i <- 0 until num_wakeup_ports)
+   //{
+   //   printf ("io.wakeup_rb_state(%d) = %d, io.wakeup_vdsts = %d\n", 
+   //            i.asUInt, io.wakeup_rb_state(i), io.wakeup_vdsts(i).bits)
+   //}
    //printf ("issue_slot(0).rob_idx = d%d, issue_slot(0).state = d%d\n", issue_slots(0).uop.rob_idx, issue_slots(0).debug.state)
 
    io.event_empty := !(issue_slots.map(s => s.valid).reduce(_|_))
@@ -115,8 +115,9 @@ abstract class IssueUnit(
       }
    }
 
-   //if (DEBUG_PRINTF)
-   if (true)
+   if (DEBUG_PRINTF)
+   //if (true)
+   //if (iqType != IQT_FP.litValue)
    {
       val typ_str = if (iqType == IQT_INT.litValue) "int"
                     else if (iqType == IQT_MEM.litValue) "mem"

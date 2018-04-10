@@ -277,7 +277,7 @@ class RegisterRead(
       val num_read_ports = num_read_ports_array(w)
 
       io.iss_readys(w) := io.exe_reqs(w).ready
-      printf("io.exe_reqs(%d).ready = b%b, ", w.asUInt, io.exe_reqs(w).ready)
+      //printf("io.exe_reqs(%d).ready = b%b, ", w.asUInt, io.exe_reqs(w).ready)
       io.exe_reqs(w).valid    := exe_reg_valids(w)
       io.exe_reqs(w).bits.uop := exe_reg_uops(w)
       if (num_read_ports > 0) io.exe_reqs(w).bits.rs1_data := exe_reg_rs1_data(w)
@@ -291,5 +291,5 @@ class RegisterRead(
       if (num_read_ports > 1) io.exe_reqs(w).bits.rs2_data := rs2_data_decoded
       if (num_read_ports > 2) io.exe_reqs(w).bits.rs3_data := rs3_data_decoded
    }
-   printf("\n")
+   //printf("\n")
 }

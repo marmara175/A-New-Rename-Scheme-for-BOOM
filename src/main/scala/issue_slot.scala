@@ -254,10 +254,10 @@ class IssueSlot(num_slow_wakeup_ports: Int, iqType: BigInt)(implicit p: Paramete
 		 {
 		    cond_fail := Bool(true)
 		 }
-		 printf ("io.wakeup_vdsts(i).bits = %d, io.wakeup_rb_state(i) = %d, cond_fail = %d\n",
-		          io.wakeup_vdsts(i).bits,
-				  io.wakeup_rb_state(i),
-				  cond_fail)
+		// printf ("io.wakeup_vdsts(i).bits = %d, io.wakeup_rb_state(i) = %d, cond_fail = %d\n",
+		//          io.wakeup_vdsts(i).bits,
+		//		  io.wakeup_rb_state(i),
+		//		  cond_fail)
 	  }
 
       when (io.wakeup_vdsts(i).valid && io.wakeup_vdsts(i).bits === slotUop.vop1)

@@ -79,6 +79,10 @@ class RobIo(machine_width: Int,
    val com_load_is_at_rob_head = Bool(OUTPUT)
 
    val rob_head = UInt(OUTPUT, log2Up(NUM_ROB_ROWS))
+   // NRR
+   val nrr_head = UInt(OUTPUT, log2Up(NUM_ROB_ENTRIES))
+   val nrr_tail = UInt(OUTPUT, log2Up(NUM_ROB_ENTRIES))
+   val nrr_used = UInt(OUTPUT, NRR)
 
    // Communicate exceptions to the CSRFile
    val com_xcpt = Valid(new CommitExceptionSignals(machine_width))
@@ -205,6 +209,10 @@ class Rob(width: Int,
    val rob_head = Reg(init = UInt(0, log2Up(num_rob_rows)))
    val rob_tail = Reg(init = UInt(0, log2Up(num_rob_rows)))
    val rob_tail_idx = rob_tail << UInt(log2Ceil(width))
+
+   val nrr_head = Wire(UInt(width = log2Up(NUM_ROB_ENTRIES)))
+   val nrr_tail = Wire(UInt(width = log2Up(NUM_ROB_ENTRIES)))
+   val nrr_used = Wire(UInt(width = NRR))
 
    val will_commit         = Wire(Vec(width, Bool()))
    val can_commit          = Wire(Vec(width, Bool()))
@@ -356,6 +364,10 @@ class Rob(width: Int,
    // --------------------------------------------------------------------------
    // **************************************************************************
 
+   // NRR
+   val my_rob_val  = Wire(Vec(DECODE_WIDTH, Bits(width = num_rob_rows)))
+   val has_int_dst = Wire(Vec(DECODE_WIDTH, Bits(width = num_rob_rows)))
+   val my_rob_bsy  = Wire(Vec(DECODE_WIDTH, Bits(width = num_rob_rows)))
 
    for (w <- 0 until width)
    {
@@ -363,13 +375,20 @@ class Rob(width: Int,
 
       // one bank
       val rob_val       = Reg(init = Vec.fill(num_rob_rows){Bool(false)})
-      val rob_bsy       = Mem(num_rob_rows, Bool())
+      // NRR
+	  val int_ldst_val  = Reg(init = Vec.fill(num_rob_rows){Bool(false)})
+      
+	  val rob_bsy       = Mem(num_rob_rows, Bool())
       val rob_uop       = Reg(Vec(num_rob_rows, new MicroOp())) // one write port - dispatch
                                                            // fake write ports - clearing on commit,
                                                            // rollback, branch_kill
       val rob_exception = Mem(num_rob_rows, Bool())
       val rob_fflags    = Mem(num_rob_rows, Bits(width=tile.FPConstants.FLAGS_SZ))
 
+      // NRR
+	  my_rob_val(w)     := rob_val.asUInt
+      has_int_dst(w)    := int_ldst_val.asUInt
+      my_rob_bsy(w)     := rob_bsy.asUInt
       //-----------------------------------------------
       // Dispatch: Add Entry to ROB
 
@@ -379,6 +398,8 @@ class Rob(width: Int,
          rob_bsy(rob_tail)       := !io.enq_uops(w).is_fence &&
                                     !(io.enq_uops(w).is_fencei)
          rob_uop(rob_tail)       := io.enq_uops(w)
+		 // NRR
+		 int_ldst_val(rob_tail)  := (io.enq_uops(w).dst_rtype === RT_FIX) && io.enq_uops(w).ldst_val
          rob_exception(rob_tail) := io.enq_uops(w).exception
          rob_fflags(rob_tail)    := Bits(0)
          rob_uop(rob_tail).stat_brjmp_mispredicted := Bool(false)
@@ -499,6 +520,8 @@ class Rob(width: Int,
       when (rob_state === s_rollback)
       {
          rob_val(com_idx)       := Bool(false)
+		 // NRR
+         //int_ldst_val(com_idx)  := Bool(false)
          rob_exception(com_idx) := Bool(false)
       }
 
@@ -526,6 +549,8 @@ class Rob(width: Int,
          when (io.brinfo.valid && io.brinfo.mispredict && entry_match)
          {
             rob_val(i) := Bool(false)
+			// NRR
+			//int_ldst_val(i) := Bool(false)
             rob_uop(UInt(i)).inst := BUBBLE
          }
          .elsewhen (io.brinfo.valid && !io.brinfo.mispredict && entry_match)
@@ -540,6 +565,9 @@ class Rob(width: Int,
       when (will_commit(w))
       {
          rob_val(rob_head) := Bool(false)
+		 // NRR
+		 //int_ldst_val(rob_head) := Bool(false)
+
       }
 
       // -----------------------------------------------
@@ -600,6 +628,47 @@ class Rob(width: Int,
       }
 
    } //for (w <- 0 until width)
+   
+   val has_int_dst_val = my_rob_val.toBits & has_int_dst.toBits
+   val nrr_tail_end    = rob_tail * DECODE_WIDTH.U 
+   
+   // nrr_head  nrr_tail
+   nrr_head := rob_head * DECODE_WIDTH.U 
+   nrr_tail := rob_head * DECODE_WIDTH.U
+   
+   var my_cnt    = 0.U(NRR.W)
+   var over_tail = false.B
+   var used      = 0.U(NRR.W)
+
+   for (i <- 0 until NUM_ROB_ENTRIES)
+   {
+      val idx   = (i.U+nrr_head)%NUM_ROB_ENTRIES.U
+	  val judge = idx(0).toBool
+	  val aim   = (!judge && has_int_dst_val(idx/2.U)) || (judge && has_int_dst_val(idx/2.U+num_rob_rows.U))
+	 
+	  val sign  = Wire(init = false.B)
+	  when (idx === nrr_tail_end)
+	  {
+	     sign      := true.B
+	  }
+	  
+	  over_tail = over_tail | sign
+
+      val mark  = Wire(init = false.B)
+	  when (!over_tail && (my_cnt < NRR.U) && aim)
+	  {
+	     mark      := true.B
+	     nrr_tail  := idx
+	  }
+	
+	  used = used + (mark & my_rob_bsy(judge)(idx/2.U)).asUInt
+	  my_cnt = my_cnt + mark.asUInt
+   }
+
+   nrr_used := used
+   
+   printf ("rob_head = %d, rob_tail = %d, has_int_dst_val = %x, nrr_head = %d, nrr_tail = %d\n", rob_head, rob_tail, has_int_dst_val, nrr_head, nrr_tail)
+   
 
    // **************************************************************************
    // --------------------------------------------------------------------------
@@ -921,7 +990,9 @@ class Rob(width: Int,
 
    io.com_load_is_at_rob_head := rob_head_is_load(PriorityEncoder(rob_head_vals.toBits))
    io.rob_head := rob_head
-
+   io.nrr_head := nrr_head
+   io.nrr_tail := nrr_tail
+   io.nrr_used := nrr_used
    //--------------------------------------------------
    // Handle passing out signals to printf in dpath
 

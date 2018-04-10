@@ -756,9 +756,9 @@ class MulDivUnit(implicit p: Parameters) extends IterativeFunctionalUnit()(p)
 
    // response
    io.resp.valid          := muldiv.io.resp.valid && !this.do_kill
-   printf ("***************MulDivUnit.muldiv.io.resp.valid = %d, this.do_kill = %d\n",
-            muldiv.io.resp.valid,
-			this.do_kill)
+   //printf ("***************MulDivUnit.muldiv.io.resp.valid = %d, this.do_kill = %d\n",
+   //         muldiv.io.resp.valid,
+   //  		this.do_kill)
    muldiv.io.resp.ready   := io.resp.ready
    io.resp.bits.data      := muldiv.io.resp.bits.data
 }

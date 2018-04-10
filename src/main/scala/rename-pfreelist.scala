@@ -84,8 +84,11 @@ class RenamePFreeListHelper(
 
 	val io = new PFreeListIO(num_write_ports, pl_width, num_physical_registers)
 
+    def freelist_len = num_physical_registers * numIntPhysRegsParts
+
     // ** FREE LIST TABLE **//
-	val freelist = Reg(init = ~Bits(0, width = num_physical_registers * numIntPhysRegsParts))
+	// val freelist = Reg(init = ~Bits(0, width = num_physical_registers * numIntPhysRegsParts))
+	val freelist = Reg(init = ~"b11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111".U(width = freelist_len.W))
 	def free_list(w: Int) = freelist((w+1)*numIntPhysRegsParts-1, w*numIntPhysRegsParts)
 
     // yangqinghong new
@@ -132,7 +135,7 @@ class RenamePFreeListHelper(
 			val alloc_mask = Wire(init = Bits(0, width=numIntPhysRegsParts))
             val begin = (idle_mask === ~Bits(0, numIntPhysRegsParts))
 			val end   = Wire(init = (begin === Bool(true)))
-	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums && (io.req_is_rob_head(req_idx) || count > 3.U))
+	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums && (io.req_is_rob_head(req_idx) || count > NRR.asUInt))
 	    	{
 				next_request_pregs(req_idx)     := preg_idx.asUInt()
 				next_request_masks(req_idx)     := alloc_parts(idle_mask, nums)
@@ -153,9 +156,7 @@ class RenamePFreeListHelper(
 		request_masks   = next_request_masks
     }
 
-   
     //printf("req_is_rob_head = b%b, count = d%d\n", io.req_is_rob_head.toBits, count)
-
 
 	var req_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)
 	var enq_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)

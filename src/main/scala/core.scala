@@ -103,7 +103,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    val int_wakeups      = Wire(Vec(num_wakeup_ports, Valid(new ExeUnitResp(xLen))))
 
    val rob_head         = rob.io.rob_head
-
+   val nrr_head         = rob.io.nrr_head
+   val nrr_tail         = rob.io.nrr_tail
 
    require (exe_units.length == issue_units.map(_.issue_width).sum)
 
@@ -547,6 +548,36 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 	  //}
    }
 
+   def is_head_range(begin: UInt, end: UInt, rob_idx: UInt, rob_entries: UInt): Bool = {
+      val res = Wire(Bool())
+	  when (end >= begin)
+	  {
+	     when ((rob_idx >= begin) && (rob_idx <= end))
+		 {
+		    res := Bool(true)
+		 }
+		 .otherwise
+		 {
+		    res := Bool(false)
+		 }
+	  }
+	  .otherwise
+	  {
+         when (rob_idx >= begin || rob_idx <= end)
+		 {
+		    res := Bool(true)
+		 }
+		 .otherwise
+		 {
+		    res := Bool(false)
+		 }
+	  }
+
+	  res
+   }
+
+   // is_head_range(rob_head, rob_idx, NUM_ROB_ENTRIES.asUInt, DECODE_WIDTH.asUInt, NRR.asUInt)
+
    // yqh
    val can_alloc  = Wire(Vec(num_irf_write_ports, Bool()))
    val alloc_pdst = Wire(Vec(num_irf_write_ports, UInt(width=TPREG_SZ)))
@@ -559,11 +590,15 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
       if (exe_units(i).is_mem_unit)
 	  {
 	     //要写回的
-	     rename_stage.io.int_alloc_pregs(al_idx).valid := ll_wbarb.io.out.fire() && ll_wbarb.io.out.bits.uop.vdst != UInt(0) && !rob.io.flush.valid
+	     rename_stage.io.int_alloc_pregs(al_idx).valid := ll_wbarb.io.out.fire() && 
+		                          ll_wbarb.io.out.bits.uop.vdst != UInt(0) && !rob.io.flush.valid
 		 rename_stage.io.int_alloc_pregs(al_idx).vreg  := ll_wbarb.io.out.bits.uop.vdst
-		 rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(ll_wbarb.io.out.bits.data)//4.U
-		 rename_stage.io.int_alloc_pregs(al_idx).br_mask := ll_wbarb.io.out.bits.uop.br_mask 
-		 rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx/2.U === rob_head)
+		 rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U//MyEncode(ll_wbarb.io.out.bits.data)//4.U
+		 rename_stage.io.int_alloc_pregs(al_idx).br_mask := ll_wbarb.io.out.bits.uop.br_mask
+		 val rob_idx = ll_wbarb.io.out.bits.uop.rob_idx
+		 rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := 
+		                          is_head_range(nrr_head, nrr_tail, rob_idx, NUM_ROB_ENTRIES.asUInt)
+		 //(ll_wbarb.io.out.bits.uop.rob_idx === (rob_head*DECODE_WIDTH.asUInt))
 
 		 when (ll_wbarb.io.out.bits.uop.vdst != UInt(0))
 		 {
@@ -580,17 +615,17 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 shift_data(al_idx):= ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))//ll_wbarb.io.out.bits.data
 
 	     //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-	     {
-           printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	       ll_wbarb.io.out.bits.uop.pc(31,0), rob_head, ll_wbarb.io.out.bits.uop.rob_idx,
-		   al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-		   al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
-	       al_idx.asUInt(), can_alloc(al_idx),
-	       al_idx.asUInt(), alloc_pdst(al_idx),
-	       al_idx.asUInt(), alloc_mask(al_idx))
-         }
+	     //{
+         //  printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	     //  ll_wbarb.io.out.bits.uop.pc(31,0), rob_head, ll_wbarb.io.out.bits.uop.rob_idx,
+		 //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+		 //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
+	     //  al_idx.asUInt(), can_alloc(al_idx),
+	     //  al_idx.asUInt(), alloc_pdst(al_idx),
+	     //  al_idx.asUInt(), alloc_mask(al_idx))
+         //}
          //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
 		 //{
 		 //   printf("error1 b%b\n", can_alloc(al_idx))
@@ -613,9 +648,12 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   val local_data = Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
 			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0) && !rob.io.flush.valid
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
-			   rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(local_data)//4.U
-			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
-               rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx/2.U === rob_head)
+			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U//MyEncode(local_data)//4.U
+			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask
+			   val rob_idx = wbresp.bits.uop.rob_idx
+               rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := 
+			                    is_head_range(nrr_head, nrr_tail, rob_idx, NUM_ROB_ENTRIES.asUInt)
+			   //(wbresp.bits.uop.rob_idx/2.U === rob_head)
 
 		       when (wbresp.bits.uop.vdst != UInt(0))
 		       {
@@ -633,18 +671,18 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   shift_data(al_idx):= ShiftByMask(local_data, alloc_mask(al_idx))//Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
                
 			   //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-         	   {
-                 printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
-	             wbresp.bits.uop.pc(31,0), rob_head, wbresp.bits.uop.rob_idx,
-			     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-			     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
-         	     al_idx.asUInt(), can_alloc(al_idx),
-         	     al_idx.asUInt(), alloc_pdst(al_idx),
-         	     al_idx.asUInt(), alloc_mask(al_idx),
-			     wbReadsCSR)
-         	   }
+         	   //{
+               //  printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
+	           //  wbresp.bits.uop.pc(31,0), rob_head, wbresp.bits.uop.rob_idx,
+			   //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+			   //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
+         	   //  al_idx.asUInt(), can_alloc(al_idx),
+         	   //  al_idx.asUInt(), alloc_pdst(al_idx),
+         	   //  al_idx.asUInt(), alloc_mask(al_idx),
+			   //  wbReadsCSR)
+         	   //}
 
                //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
 		       //{
@@ -657,9 +695,12 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			{
 			   rename_stage.io.int_alloc_pregs(al_idx).valid := wbIsValid(RT_FIX) && wbresp.bits.uop.vdst != UInt(0) && !rob.io.flush.valid
 			   rename_stage.io.int_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
-			   rename_stage.io.int_alloc_pregs(al_idx).nums  := MyEncode(wbresp.bits.data)//4.U
+			   rename_stage.io.int_alloc_pregs(al_idx).nums  := 4.U//MyEncode(wbresp.bits.data)//4.U
 			   rename_stage.io.int_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask
-			   rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx/2.U === rob_head)
+			   val rob_idx = wbresp.bits.uop.rob_idx
+			   rename_stage.io.int_alloc_pregs(al_idx).is_rob_head := 
+			                    is_head_range(nrr_head, nrr_tail, rob_idx, NUM_ROB_ENTRIES.asUInt)
+			   //(wbresp.bits.uop.rob_idx/2.U === rob_head)
 
 
 		       when (wbresp.bits.uop.vdst != UInt(0))
@@ -678,17 +719,17 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   shift_data(al_idx):= ShiftByMask(wbresp.bits.data, alloc_mask(al_idx))//wbresp.bits.data
 
                //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-			   {
-                    printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	                wbresp.bits.uop.pc(31,0),rob_head, wbresp.bits.uop.rob_idx, 
-			    	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-			    	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
-                  	al_idx.asUInt(), can_alloc(al_idx),
-                	al_idx.asUInt(), alloc_pdst(al_idx),
-                	al_idx.asUInt(), alloc_mask(al_idx))
-               }
+			   //{
+               //     printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	           //     wbresp.bits.uop.pc(31,0),rob_head, wbresp.bits.uop.rob_idx, 
+			   // 	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+			   // 	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
+               //   	al_idx.asUInt(), can_alloc(al_idx),
+               // 	al_idx.asUInt(), alloc_pdst(al_idx),
+               // 	al_idx.asUInt(), alloc_mask(al_idx))
+               //}
 
                //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
 		       //{
@@ -770,13 +811,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		    int_wakeups(wu_idx).bits.uop.dst_mask := alloc_mask(swu_idx)
             int_wakeups(wu_idx).bits.state := get_state(can_alloc(swu_idx))
 
-            printf ("valid = %d, int_wakeups(wu_idx).bits.uop.vdst = %d, int_wakeups(wu_idx).bits.state = %d, resp.valid = %d, resp.bits.uop.ctrl.rf_wen = %d, resp.bits.uop.dst_rtype === RT_FIX = %d\n", 
-			         resp.valid && resp.bits.uop.ctrl.rf_wen && resp.bits.uop.dst_rtype === RT_FIX,
-					 int_wakeups(wu_idx).bits.uop.vdst,
-					 int_wakeups(wu_idx).bits.state,
-					 resp.valid,
-					 resp.bits.uop.ctrl.rf_wen,
-					 resp.bits.uop.dst_rtype === RT_FIX)
+            //printf ("valid = %d, int_wakeups(wu_idx).bits.uop.vdst = %d, int_wakeups(wu_idx).bits.state = %d, resp.valid = %d, resp.bits.uop.ctrl.rf_wen = %d, resp.bits.uop.dst_rtype === RT_FIX = %d\n", 
+			//         resp.valid && resp.bits.uop.ctrl.rf_wen && resp.bits.uop.dst_rtype === RT_FIX,
+			//		 int_wakeups(wu_idx).bits.uop.vdst,
+			//		 int_wakeups(wu_idx).bits.state,
+			//		 resp.valid,
+			//		 resp.bits.uop.ctrl.rf_wen,
+			//		 resp.bits.uop.dst_rtype === RT_FIX)
 
 		    //when (int_wakeups(wu_idx).valid)
 		    //{
@@ -929,7 +970,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
         (state, wakeup) <- iu.io.wakeup_rb_state zip int_wakeups
    }{
       state := wakeup.bits.state
-	  printf ("state = %d, wakeup.bits.state = %d", state, wakeup.bits.state)
+	  //printf ("state = %d, wakeup.bits.state = %d", state, wakeup.bits.state)
    }
 
    for {iu <- issue_units}
@@ -1022,7 +1063,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    }
    require (idx == exe_units.num_total_bypass_ports)
 
-   printf("mem req: pc = 0x%x\n", exe_units(0).io.req.bits.uop.pc(31, 0))
+   //printf("mem req: pc = 0x%x\n", exe_units(0).io.req.bits.uop.pc(31, 0))
 
 
    // don't send IntToFP moves to integer execution units.
@@ -1175,13 +1216,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    ll_wbarb.io.in(0).valid := mem_resp.valid && mem_resp.bits.uop.ctrl.rf_wen && mem_resp.bits.uop.dst_rtype === RT_FIX
    ll_wbarb.io.in(0).bits  := mem_resp.bits
 
-   printf("mem resp: pc = 0x%x\n", mem_resp.bits.uop.pc(31,0))
-   printf("ll_wbarb_in: pc = 0x%x, valid = b%b, rf_wen = b%b, FIX = b%b\n", 
-           ll_wbarb.io.in(0).bits.uop.pc(31,0),
-		   mem_resp.valid,
-		   mem_resp.bits.uop.ctrl.rf_wen,
-		   mem_resp.bits.uop.dst_rtype === RT_FIX)
-   printf("ll_wbarb_out: pc = 0x%x, valid = b%b\n", ll_wbarb.io.out.bits.uop.pc(31,0), ll_wbarb.io.out.valid)
+   //printf("mem resp: pc = 0x%x\n", mem_resp.bits.uop.pc(31,0))
+   //printf("ll_wbarb_in: pc = 0x%x, valid = b%b, rf_wen = b%b, FIX = b%b\n", 
+   //        ll_wbarb.io.in(0).bits.uop.pc(31,0),
+   // 	   mem_resp.valid,
+   // 	   mem_resp.bits.uop.ctrl.rf_wen,
+   // 	   mem_resp.bits.uop.dst_rtype === RT_FIX)
+   //printf("ll_wbarb_out: pc = 0x%x, valid = b%b\n", ll_wbarb.io.out.bits.uop.pc(31,0), ll_wbarb.io.out.valid)
 
    assert (ll_wbarb.io.in(0).ready) // never backpressure the memory unit.
    ll_wbarb.io.in(1) <> fp_pipeline.io.toint

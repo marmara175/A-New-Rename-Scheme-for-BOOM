@@ -440,14 +440,14 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
       io.ready_for_load_wk := Bool(true)
    }
 
-   printf ("laq_addr_val(exe_ld_idx_wakeup) = b%b, ~laq_executed(exe_ld_idx_wakeup) = b%b, is_rob_head = b%b, laq_uop(exe_ld_idx_wakeup).rob_idx = d%d, rob_head = d%d, io.ready_for_load_wk = d%d\n",
-   laq_addr_val(exe_ld_idx_wakeup),
-   ~laq_executed(exe_ld_idx_wakeup),
-   is_rob_head,
-   laq_uop(exe_ld_idx_wakeup).rob_idx,
-   io.rob_head,
-   io.ready_for_load_wk
-   )
+   //printf ("laq_addr_val(exe_ld_idx_wakeup) = b%b, ~laq_executed(exe_ld_idx_wakeup) = b%b, is_rob_head = b%b, laq_uop(exe_ld_idx_wakeup).rob_idx = d%d, rob_head = d%d, io.ready_for_load_wk = d%d\n",
+   //laq_addr_val(exe_ld_idx_wakeup),
+   //~laq_executed(exe_ld_idx_wakeup),
+   //is_rob_head,
+   //laq_uop(exe_ld_idx_wakeup).rob_idx,
+   //io.rob_head,
+   //io.ready_for_load_wk
+   //)
 
    when (laq_addr_val       (exe_ld_idx_wakeup) &&
          !laq_is_virtual    (exe_ld_idx_wakeup) &&
@@ -827,18 +827,18 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
                          (mem_fired_ld && ldld_addr_conflict) ||
                          mem_ld_killed ||
                          (mem_fired_st && io.nack.valid && !io.nack.isload)
-   printf ("io.memreq_kill = b%b, mem_ld_used_tlb = b%b, mem_tlb_miss = b%b, Reg(next=pf_ld || ma_ld) = b%b, mem_fired_ld = b%b, ldst_addr_conflicts.toBits =/= UInt(0) = b%b, ldld_addr_conflict = b%b, mem_ld_killed = b%b, mem_fired_st = b%b, io.nack.valid = b%b, io.nack.isload = b%b\n",            
-            io.memreq_kill,
-			mem_ld_used_tlb,
-			mem_tlb_miss,
-			Reg(next=pf_ld || ma_ld),
-			mem_fired_ld,
-			ldst_addr_conflicts.toBits =/= UInt(0),
-			ldld_addr_conflict,
-			mem_ld_killed,
-			mem_fired_st,
-			io.nack.valid,
-			io.nack.isload)
+//   printf ("io.memreq_kill = b%b, mem_ld_used_tlb = b%b, mem_tlb_miss = b%b, Reg(next=pf_ld || ma_ld) = b%b, mem_fired_ld = b%b, ldst_addr_conflicts.toBits =/= UInt(0) = b%b, ldld_addr_conflict = b%b, mem_ld_killed = b%b, mem_fired_st = b%b, io.nack.valid = b%b, io.nack.isload = b%b\n",            
+//            io.memreq_kill,
+//			mem_ld_used_tlb,
+//			mem_tlb_miss,
+//			Reg(next=pf_ld || ma_ld),
+//			mem_fired_ld,
+//			ldst_addr_conflicts.toBits =/= UInt(0),
+//			ldld_addr_conflict,
+//			mem_ld_killed,
+//			mem_fired_st,
+//			io.nack.valid,
+//			io.nack.isload)
 
    wb_forward_std_idx := forwarding_age_logic.io.forwarding_idx
 
@@ -1341,8 +1341,8 @@ class LoadStoreUnit(pl_width: Int)(implicit p: Parameters, edge: uncore.tilelink
    io.counters.stld_order_fail := RegNext(stld_order_fail)
    io.counters.ldld_order_fail := RegNext(ldld_order_fail)
 
-   if (true)
-   //if (DEBUG_PRINTF_LSU)
+   //if (true)
+   if (DEBUG_PRINTF_LSU)
    {
       printf("wakeup_idx: %d, ld is head of ROB:%d\n", exe_ld_idx_wakeup, io.commit_load_at_rob_head)
       for (i <- 0 until NUM_LSU_ENTRIES)

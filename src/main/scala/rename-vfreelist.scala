@@ -73,7 +73,7 @@ class RenameVFreeListHelper(
    val io = new VFreeListIo(num_virtual_registers, pl_width)
 
    // ** FREE LIST TABLE ** //
-   val free_list = Reg(init=(~Bits(1,num_virtual_registers)))
+   val free_list = Reg(init = ~"b11111111111111111111111111111111".U(num_virtual_registers.W))
 
    //printf("vfreelist = b%b\n", free_list)
 

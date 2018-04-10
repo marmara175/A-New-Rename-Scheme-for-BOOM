@@ -40,7 +40,7 @@ class RenameL2VMapTableElementIo(pl_width: Int)(implicit p: Parameters) extends 
    override def cloneType: this.type = new RenameL2VMapTableElementIo(pl_width).asInstanceOf[this.type]
 }
 
-class RenameL2VMapTableElement(pipeline_width: Int, always_zero: Boolean)(implicit p: Parameters) extends BoomModule()(p)
+class RenameL2VMapTableElement(pipeline_width: Int, always_zero: Boolean, idx: Int)(implicit p: Parameters) extends BoomModule()(p)
 {
    val io = new RenameL2VMapTableElementIo(pipeline_width)
 
@@ -52,7 +52,7 @@ class RenameL2VMapTableElement(pipeline_width: Int, always_zero: Boolean)(implic
    // out in the meantime. A software solution is also possible, but I'm
    // unwilling to trust that.
 
-   val element = Reg(init = UInt(0, TPREG_SZ))
+   val element = Reg(init = UInt(idx, TPREG_SZ))
 
    // handle branch speculation
    val element_br_copies = Mem(MAX_BR_COUNT, UInt(width = TPREG_SZ))
@@ -166,7 +166,7 @@ class RenameL2VMapTable(
 
    val entries = for (i <- 0 until num_logical_registers) yield
    {
-      val entry = Module(new RenameL2VMapTableElement(pl_width, always_zero = (i==0 && rtype == RT_FIX.litValue)))
+      val entry = Module(new RenameL2VMapTableElement(pl_width, always_zero = (i==0 && rtype == RT_FIX.litValue), i))
       entry
    }
    val map_table_io = Vec(entries.map(_.io))

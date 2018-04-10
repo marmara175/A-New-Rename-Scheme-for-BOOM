@@ -107,6 +107,40 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
       "\n   Num Wakeup Ports      : " + num_wakeup_ports +
       "\n   Num Bypass Ports      : " + exe_units.num_total_bypass_ports + "\n"
 
+
+   def is_head_range(rob_head: UInt, rob_idx: UInt, rob_entries: UInt, rob_banks: UInt, nrr: UInt): Bool = {
+      val begin = rob_head * rob_banks
+	  val end = (begin + nrr) % rob_entries
+
+      val res = Wire(Bool())
+	  when (end > begin)
+	  {
+	     when ((rob_idx >= begin) && (rob_idx < end))
+		 {
+		    res := Bool(true)
+		 }
+		 .otherwise
+		 {
+		    res := Bool(false)
+		 }
+	  }
+	  .otherwise
+	  {
+         when (rob_idx >= begin || rob_idx < end)
+		 {
+		    res := Bool(true)
+		 }
+		 .otherwise
+		 {
+		    res := Bool(false)
+		 }
+	  }
+
+	  res
+   }
+
+   //is_head_range(rob_head, rob_idx, NUM_ROB_ENTRIES.asUInt, DECODE_WIDTH.asUInt, NRR.asUInt)
+
    def get_state(can_alloc: Bool): UInt = 
    {
       val state = Wire(UInt(2.W))
@@ -261,7 +295,9 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    io.fp_alloc_pregs(0).vreg  := ll_wbarb.io.out.bits.uop.vdst
    io.fp_alloc_pregs(0).nums  := 4.U
    io.fp_alloc_pregs(0).br_mask := ll_wbarb.io.out.bits.uop.br_mask
-   io.fp_alloc_pregs(0).is_rob_head := (ll_wbarb.io.out.bits.uop.rob_idx/2.U === io.rob_head)
+   io.fp_alloc_pregs(0).is_rob_head := 
+            is_head_range(io.rob_head, ll_wbarb.io.out.bits.uop.rob_idx, NUM_ROB_ENTRIES.asUInt, DECODE_WIDTH.asUInt, NRR.asUInt)
+   //(ll_wbarb.io.out.bits.uop.rob_idx/2.U === io.rob_head)
    can_alloc(0) := io.fp_alloc_pregs(0).can_alloc
    alloc_pdst(0):= io.fp_alloc_pregs(0).preg
    alloc_mask(0):= io.fp_alloc_pregs(0).mask
@@ -282,7 +318,9 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
             io.fp_alloc_pregs(al_idx).vreg  := wbresp.bits.uop.vdst
             io.fp_alloc_pregs(al_idx).nums  := 4.U
 			io.fp_alloc_pregs(al_idx).br_mask := wbresp.bits.uop.br_mask 
-            io.fp_alloc_pregs(al_idx).is_rob_head := (wbresp.bits.uop.rob_idx/2.U === io.rob_head) 
+            io.fp_alloc_pregs(al_idx).is_rob_head := 
+			   is_head_range(io.rob_head, wbresp.bits.uop.rob_idx, NUM_ROB_ENTRIES.asUInt, DECODE_WIDTH.asUInt, NRR.asUInt)
+			//(wbresp.bits.uop.rob_idx/2.U === io.rob_head) 
 			can_alloc(al_idx) := io.fp_alloc_pregs(al_idx).can_alloc 
 			alloc_pdst(al_idx):= io.fp_alloc_pregs(al_idx).preg
 			alloc_mask(al_idx):= io.fp_alloc_pregs(al_idx).mask

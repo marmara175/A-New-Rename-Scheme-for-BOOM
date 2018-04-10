@@ -298,11 +298,11 @@ class ALUExeUnit(
                                        ((io.req.bits.uop.fu_code_is(FU_DIV) && Bool(has_div)) ||
                                         (io.req.bits.uop.fu_code_is(FU_MUL) && Bool(has_mul && use_slow_mul)))
 	  muldiv.io.req.bits.uop        := io.req.bits.uop
-	  printf ("*********************req_valid = %d, muldiv.io.req.valid = %d, muldiv.io.req.bits.uop.vdst = %d, muldiv.io.req.bits.kill = %d\n",
-	           io.req.valid,
-			   muldiv.io.req.valid,
-			   muldiv.io.req.bits.uop.vdst,
-			   muldiv.io.req.bits.kill)
+	//  printf ("*********************req_valid = %d, muldiv.io.req.valid = %d, muldiv.io.req.bits.uop.vdst = %d, muldiv.io.req.bits.kill = %d\n",
+	//           io.req.valid,
+	//		   muldiv.io.req.valid,
+	//		   muldiv.io.req.bits.uop.vdst,
+	//		   muldiv.io.req.bits.kill)
 
       muldiv.io.req.bits.rs1_data   := io.req.bits.rs1_data
       muldiv.io.req.bits.rs2_data   := io.req.bits.rs2_data
@@ -316,10 +316,10 @@ class ALUExeUnit(
 	  		io.req.ready := false.B
 	  }
       muldiv_resp_val := muldiv.io.resp.valid
-	  printf ("****************muldiv.io.resp.valid = %d, muldiv.io.resp.bits.uop.vdst = %d, valids = b%b\n",
-	           muldiv.io.resp.valid,
-			   muldiv.io.resp.bits.uop.vdst,
-			   Vec(fu_units.map(_.io.resp.valid)).asUInt)
+	//  printf ("****************muldiv.io.resp.valid = %d, muldiv.io.resp.bits.uop.vdst = %d, valids = b%b\n",
+	//           muldiv.io.resp.valid,
+	//		   muldiv.io.resp.bits.uop.vdst,
+	//		   Vec(fu_units.map(_.io.resp.valid)).asUInt)
 
       muldiv_busy := !muldiv.io.req.ready ||
                      (io.req.valid && (io.req.bits.uop.fu_code_is(FU_DIV) ||
@@ -332,7 +332,7 @@ class ALUExeUnit(
    assert (io.resp(0).ready) // don'yet support back-pressuring this unit.
 
    io.resp(0).valid    := fu_units.map(_.io.resp.valid).reduce(_|_)
-   printf ("********************io.resp(0).valid = %d\n", io.resp(0).valid)
+   //printf ("********************io.resp(0).valid = %d\n", io.resp(0).valid)
    io.resp(0).bits.uop := new MicroOp().fromBits(
                            PriorityMux(fu_units.map(f => (f.io.resp.valid, f.io.resp.bits.uop.toBits))))
    io.resp(0).bits.data:= PriorityMux(fu_units.map(f => (f.io.resp.valid, f.io.resp.bits.data.toBits))).toBits
