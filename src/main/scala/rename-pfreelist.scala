@@ -102,7 +102,7 @@ class RenamePFreeListHelper(
 
     var count = PopCount(freelist_free.toBits)
 
-	//printf("pfreelist = 0x%x\n", freelist)
+	printf("pfreelist = 0x%x\n", freelist)
 
     // track all allocations that have occurred since branch passed by
     // can quickly reset pipeline on branch mispredict
@@ -157,7 +157,7 @@ class RenamePFreeListHelper(
 		request_masks   = next_request_masks
     }
 
-    //printf("req_is_rob_head = b%b, count = d%d, (NRR.asUInt-io.nrr_used) = %d\n", io.req_is_rob_head.toBits, count, NRR.asUInt-io.nrr_used)
+    printf("req_is_rob_head = b%b, count = d%d, (NRR.asUInt-io.nrr_used) = %d\n", io.req_is_rob_head.toBits, count, NRR.asUInt-io.nrr_used)
 
 	var req_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)
 	var enq_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)

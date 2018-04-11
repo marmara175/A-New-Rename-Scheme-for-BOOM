@@ -661,13 +661,13 @@ class Rob(width: Int,
 	     nrr_tail  := idx
 	  }
 	
-	  used = used + (mark & my_rob_bsy(judge)(idx/2.U)).asUInt
+	  used = used + (mark & ~my_rob_bsy(judge)(idx/2.U)).asUInt
 	  my_cnt = my_cnt + mark.asUInt
    }
 
    nrr_used := used
    
-   //printf ("rob_head = %d, rob_tail = %d, has_int_dst_val = %x, my_rob_val.toBits = %x, my_rob_bsy.toBits = %x, nrr_head = %d, nrr_tail = %d, nrr_used = %d\n", rob_head, rob_tail, has_int_dst_val, my_rob_val.toBits, my_rob_bsy.toBits, nrr_head, nrr_tail, nrr_used)
+   printf ("rob_head = %d, rob_tail = %d, has_int_dst_val = %x, my_rob_val.toBits = %x, my_rob_bsy.toBits = %x, nrr_head = %d, nrr_tail = %d, nrr_used = %d\n", rob_head, rob_tail, has_int_dst_val, my_rob_val.toBits, my_rob_bsy.toBits, nrr_head, nrr_tail, nrr_used)
    
 
    // **************************************************************************

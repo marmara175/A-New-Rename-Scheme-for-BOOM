@@ -618,17 +618,17 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 shift_data(al_idx):= ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))//ll_wbarb.io.out.bits.data
 
 	     //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-	     //{
-         //  printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	     //  ll_wbarb.io.out.bits.uop.pc(31,0), rob_head, ll_wbarb.io.out.bits.uop.rob_idx,
-		 //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	     //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-		 //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
-	     //  al_idx.asUInt(), can_alloc(al_idx),
-	     //  al_idx.asUInt(), alloc_pdst(al_idx),
-	     //  al_idx.asUInt(), alloc_mask(al_idx))
-         //}
+	     {
+           printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 1111: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	       ll_wbarb.io.out.bits.uop.pc(31,0), rob_head, ll_wbarb.io.out.bits.uop.rob_idx,
+		   al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	       al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+		   al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
+	       al_idx.asUInt(), can_alloc(al_idx),
+	       al_idx.asUInt(), alloc_pdst(al_idx),
+	       al_idx.asUInt(), alloc_mask(al_idx))
+         }
          //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
 		 //{
 		 //   printf("error1 b%b\n", can_alloc(al_idx))
@@ -674,18 +674,18 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   shift_data(al_idx):= ShiftByMask(local_data, alloc_mask(al_idx))//Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
                
 			   //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-         	   //{
-               //  printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
-	           //  wbresp.bits.uop.pc(31,0), rob_head, wbresp.bits.uop.rob_idx,
-			   //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	           //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-			   //  al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
-         	   //  al_idx.asUInt(), can_alloc(al_idx),
-         	   //  al_idx.asUInt(), alloc_pdst(al_idx),
-         	   //  al_idx.asUInt(), alloc_mask(al_idx),
-			   //  wbReadsCSR)
-         	   //}
+         	   {
+                 printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
+	             wbresp.bits.uop.pc(31,0), rob_head, wbresp.bits.uop.rob_idx,
+			     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	             al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+			     al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
+         	     al_idx.asUInt(), can_alloc(al_idx),
+         	     al_idx.asUInt(), alloc_pdst(al_idx),
+         	     al_idx.asUInt(), alloc_mask(al_idx),
+			     wbReadsCSR)
+         	   }
 
                //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
 		       //{
@@ -722,17 +722,17 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   shift_data(al_idx):= ShiftByMask(wbresp.bits.data, alloc_mask(al_idx))//wbresp.bits.data
 
                //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
-			   //{
-               //     printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
-	           //     wbresp.bits.uop.pc(31,0),rob_head, wbresp.bits.uop.rob_idx, 
-			   // 	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
-	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
-	           //  	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
-			   // 	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
-               //   	al_idx.asUInt(), can_alloc(al_idx),
-               // 	al_idx.asUInt(), alloc_pdst(al_idx),
-               // 	al_idx.asUInt(), alloc_mask(al_idx))
-               //}
+			   {
+                    printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
+	                wbresp.bits.uop.pc(31,0),rob_head, wbresp.bits.uop.rob_idx, 
+			    	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).valid,
+	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).vreg,
+	             	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).nums,
+			    	al_idx.asUInt(), rename_stage.io.int_alloc_pregs(al_idx).is_rob_head,
+                  	al_idx.asUInt(), can_alloc(al_idx),
+                	al_idx.asUInt(), alloc_pdst(al_idx),
+                	al_idx.asUInt(), alloc_mask(al_idx))
+               }
 
                //when (rename_stage.io.int_alloc_pregs(al_idx).valid && !can_alloc(al_idx))
 		       //{
