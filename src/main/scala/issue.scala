@@ -117,8 +117,8 @@ abstract class IssueUnit(
       }
    }
 
-   //if (DEBUG_PRINTF)
-   if (true)
+   if (DEBUG_PRINTF)
+   //if (true)
    //if (iqType != IQT_FP.litValue)
    {
       val typ_str = if (iqType == IQT_INT.litValue) "int"
