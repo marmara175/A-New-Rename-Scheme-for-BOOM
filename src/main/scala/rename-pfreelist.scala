@@ -45,6 +45,7 @@ class PFreeListIO(
     val rollback_pdsts		= Vec(pl_width, UInt(width=preg_sz)).asInput
     val rollback_masks		= Vec(pl_width, UInt(width=numIntPhysRegsParts)).asInput
 
+    val nrr_used            = UInt(INPUT, NRR)
 }
 
 class RenamePFreeListHelper(
@@ -135,7 +136,7 @@ class RenamePFreeListHelper(
 			val alloc_mask = Wire(init = Bits(0, width=numIntPhysRegsParts))
             val begin = (idle_mask === ~Bits(0, numIntPhysRegsParts))
 			val end   = Wire(init = (begin === Bool(true)))
-	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums && (io.req_is_rob_head(req_idx) || count > NRR.asUInt))
+	    	when (io.req_preg_vals(req_idx) && !allocated(req_idx) && idle_size >= nums && (io.req_is_rob_head(req_idx) || count > (NRR.asUInt-io.nrr_used)))
 	    	{
 				next_request_pregs(req_idx)     := preg_idx.asUInt()
 				next_request_masks(req_idx)     := alloc_parts(idle_mask, nums)
@@ -156,7 +157,7 @@ class RenamePFreeListHelper(
 		request_masks   = next_request_masks
     }
 
-    //printf("req_is_rob_head = b%b, count = d%d\n", io.req_is_rob_head.toBits, count)
+    //printf("req_is_rob_head = b%b, count = d%d, (NRR.asUInt-io.nrr_used) = %d\n", io.req_is_rob_head.toBits, count, NRR.asUInt-io.nrr_used)
 
 	var req_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)
 	var enq_free_list	= Bits(0, width = num_physical_registers * numIntPhysRegsParts)
@@ -314,7 +315,8 @@ class RenamePFreeList(
 		val rollback_wens   = Vec(pl_width, Bool()).asInput
 		val rollback_pdsts  = Vec(pl_width, UInt(width=preg_sz)).asInput
 		val rollback_masks  = Vec(pl_width, UInt(width=numIntPhysRegsParts)).asInput
-    }
+        val nrr_used        = UInt(INPUT, NRR)
+	}
 
     val pfreelist = Module(new RenamePFreeListHelper(
         num_write_ports,
@@ -324,6 +326,7 @@ class RenamePFreeList(
     pfreelist.io.br_mispredict_val := io.brinfo.mispredict
     pfreelist.io.br_mispredict_tag := io.brinfo.tag
 
+    pfreelist.io.nrr_used := io.nrr_used
     pfreelist.io.enq_vals := io.enq_vals
     pfreelist.io.enq_pregs := io.enq_pregs
     pfreelist.io.enq_masks := io.enq_masks

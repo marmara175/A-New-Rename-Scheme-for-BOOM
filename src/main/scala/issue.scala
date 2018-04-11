@@ -17,7 +17,7 @@ import util.Str
 
 import scala.collection.mutable.ArrayBuffer
 
-//-------------------------------------------------------------
+//------------------------------across_rb_state-------------------------------
 //-------------------------------------------------------------
 
 case class IssueParams(
@@ -93,6 +93,8 @@ abstract class IssueUnit(
    //}
    //printf ("issue_slot(0).rob_idx = d%d, issue_slot(0).state = d%d\n", issue_slots(0).uop.rob_idx, issue_slots(0).debug.state)
 
+   //printf ("across_rb_val = %d, across_rb_state = %d, across_rb_vdst = %d\n", io.across_rb_val, io.across_rb_state, io.across_rb_vdst)
+
    io.event_empty := !(issue_slots.map(s => s.valid).reduce(_|_))
 
    //-------------------------------------------------------------
@@ -115,7 +117,7 @@ abstract class IssueUnit(
       }
    }
 
-   if (DEBUG_PRINTF)
+   //if (DEBUG_PRINTF)
    //if (true)
    //if (iqType != IQT_FP.litValue)
    {

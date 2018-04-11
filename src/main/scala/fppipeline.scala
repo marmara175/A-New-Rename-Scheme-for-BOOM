@@ -304,9 +304,11 @@ class FpPipeline(implicit p: Parameters) extends BoomModule()(p)
    io.alloc_err(0) := io.fp_alloc_pregs(0).valid && !can_alloc(0)
    //require( !ll_wbarb.io.out.fire() || can_alloc(0))
 
-   io.f2i_rb_val   := io.fp_alloc_pregs(0).valid && !can_alloc(0)
+   io.f2i_rb_val   := io.fp_alloc_pregs(0).valid
    io.f2i_rb_state := get_state(can_alloc(0))
    io.f2i_rb_vdst  := ll_wbarb.io.out.bits.uop.vdst
+
+   //printf ("io.f2i_rb_val = %d, io.f2i_rb_state = %d, io.f2i_rb_vdst = %d\n", io.f2i_rb_val, io.f2i_rb_state, io.f2i_rb_vdst)
 
    var al_idx = 1
    for (eu <- exe_units)

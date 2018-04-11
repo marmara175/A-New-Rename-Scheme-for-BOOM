@@ -378,7 +378,7 @@ class Rob(width: Int,
       // NRR
 	  val int_ldst_val  = Reg(init = Vec.fill(num_rob_rows){Bool(false)})
       
-	  val rob_bsy       = Mem(num_rob_rows, Bool())
+	  val rob_bsy       = Reg(Vec(num_rob_rows, Bool()))
       val rob_uop       = Reg(Vec(num_rob_rows, new MicroOp())) // one write port - dispatch
                                                            // fake write ports - clearing on commit,
                                                            // rollback, branch_kill
@@ -667,7 +667,7 @@ class Rob(width: Int,
 
    nrr_used := used
    
-   printf ("rob_head = %d, rob_tail = %d, has_int_dst_val = %x, nrr_head = %d, nrr_tail = %d\n", rob_head, rob_tail, has_int_dst_val, nrr_head, nrr_tail)
+   //printf ("rob_head = %d, rob_tail = %d, has_int_dst_val = %x, my_rob_val.toBits = %x, my_rob_bsy.toBits = %x, nrr_head = %d, nrr_tail = %d, nrr_used = %d\n", rob_head, rob_tail, has_int_dst_val, my_rob_val.toBits, my_rob_bsy.toBits, nrr_head, nrr_tail, nrr_used)
    
 
    // **************************************************************************

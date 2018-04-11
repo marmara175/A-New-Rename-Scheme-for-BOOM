@@ -92,6 +92,8 @@ class RenameStageIO(
 
    val flush_pipeline = Bool(INPUT) // only used for SCR (single-cycle reset)
 
+   val nrr_used   = UInt(INPUT, NRR)
+
    val debug_rob_empty = Bool(INPUT)
    val debug = new DebugRenameStageIO(num_int_pregs, num_fp_pregs).asOutput
 }
@@ -378,6 +380,7 @@ class RenameStage(
        io.int_alloc_pregs(w).mask           := i_pfreelist.io.req_masks(w)
    }
 
+   i_pfreelist.io.nrr_used          := io.nrr_used
    i_pfreelist.io.brinfo 			:= io.brinfo
    i_pfreelist.io.enq_vals 			:= i_v2p_maptable.io.enq_valids 
    i_pfreelist.io.enq_pregs 		:= i_v2p_maptable.io.enq_pregs
@@ -403,6 +406,7 @@ class RenameStage(
        io.fp_alloc_pregs(w).mask            := f_pfreelist.io.req_masks(w)
    }
 
+   f_pfreelist.io.nrr_used          := UInt(0) // ???
    f_pfreelist.io.brinfo 			:= io.brinfo
    f_pfreelist.io.enq_vals 			:= f_v2p_maptable.io.enq_valids 
    f_pfreelist.io.enq_pregs 		:= f_v2p_maptable.io.enq_pregs

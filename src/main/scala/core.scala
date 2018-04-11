@@ -105,6 +105,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    val rob_head         = rob.io.rob_head
    val nrr_head         = rob.io.nrr_head
    val nrr_tail         = rob.io.nrr_tail
+   val nrr_used         = rob.io.nrr_used
 
    require (exe_units.length == issue_units.map(_.issue_width).sum)
 
@@ -428,6 +429,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
    rename_stage.io.dec_will_fire := dec_will_fire
    rename_stage.io.dec_uops := dec_uops
+
+   rename_stage.io.nrr_used := nrr_used
 
    def get_state(can_alloc: Bool): UInt = 
    {
@@ -1173,10 +1176,12 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
             llidx = w_cnt
 
             // connect to FP pipeline's long latency writeport.
-            fp_pipeline.io.ll_wport.valid     := wbIsValid(RT_FLT)
+            fp_pipeline.io.ll_wport.valid     := 
+			              wbresp.valid && wbresp.bits.uop.ctrl.rf_wen && wbresp.bits.uop.dst_rtype === RT_FLT//wbIsValid(RT_FLT)
             fp_pipeline.io.ll_wport.bits.uop  := wbresp.bits.uop
             fp_pipeline.io.ll_wport.bits.data := wbresp.bits.data
             fp_pipeline.io.ll_wport.bits.fflags.valid := Bool(false)
+			//printf ("fp_pipeline.io.ll_wport.valid = %d, fp_pipeline.io.ll_wport.bits.uop.vdst = %d, fp_pipeline.io.ll_wport.bits.uop.rob_idx = %d\n", fp_pipeline.io.ll_wport.valid, fp_pipeline.io.ll_wport.bits.uop.vdst, fp_pipeline.io.ll_wport.bits.uop.rob_idx)
          }
          else
          {
@@ -1232,15 +1237,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    iregfile.io.write_ports(llidx).bits.mask := alloc_mask(llidx)
    iregfile.io.write_ports(llidx).bits.data := shift_data(llidx)
 
-   fp_pipeline.io.i2f_rb_val   := ll_wbarb.io.out.valid && !can_alloc(llidx)
-   when (can_alloc(llidx))
-   {
-      fp_pipeline.io.i2f_rb_state := 1.U
-   }
-   .otherwise
-   {
-      fp_pipeline.io.i2f_rb_state := 2.U
-   }
+   fp_pipeline.io.i2f_rb_val   := ll_wbarb.io.out.valid && (ll_wbarb.io.out.bits.uop.fu_code === FUConstants.FU_F2I)
+   fp_pipeline.io.i2f_rb_state := get_state(can_alloc(llidx))
    fp_pipeline.io.i2f_rb_vdst  := ll_wbarb.io.out.bits.uop.vdst 
 
 /*
@@ -1333,7 +1331,7 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    for ((wakeup, alloc_err) <- fp_pipeline.io.wakeups zip fp_pipeline.io.alloc_err)
    {
       rob.io.wb_resps(cnt) <> wakeup
-	  rob.io.wb_resps(cnt).valid := wakeup.valid && alloc_err
+	  rob.io.wb_resps(cnt).valid := wakeup.valid && !alloc_err
       rob.io.fflags(f_cnt) <> wakeup.bits.fflags
       rob.io.debug_wb_valids(cnt) := Bool(false) // TODO XXX add back commit logging for FP instructions.
       cnt += 1
