@@ -223,7 +223,7 @@ trait HasBoomCoreParameters extends tile.HasCoreParameters
    val NUM_BROB_ENTRIES  = NUM_ROB_ROWS //TODO explore smaller BROBs
    val BROB_ADDR_SZ      = log2Up(NUM_BROB_ENTRIES)
 
-   val NRR               = 4
+   val NRR               = 10
 
    require (numIntVPhysRegs >= (32 + DECODE_WIDTH))
    require (numFpVPhysRegs >= (32 + DECODE_WIDTH))

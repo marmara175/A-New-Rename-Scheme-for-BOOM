@@ -587,6 +587,9 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
    val alloc_mask = Wire(Vec(num_irf_write_ports, UInt(width=numIntPhysRegsParts)))
    val shift_data = Wire(Vec(num_irf_write_ports, UInt(width=64)))
 
+   val will_alloc_excpt = Wire(Bool())
+   will_alloc_excpt := Bool(false)
+
    var al_idx = 0
    for (i <- 0 until exe_units.length)
    {
@@ -616,6 +619,12 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			can_alloc(al_idx) := true.B
 		 }
 		 shift_data(al_idx):= ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))//ll_wbarb.io.out.bits.data
+
+         when (rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
+		 {
+		    will_alloc_excpt := Bool(true)
+			printf ("physical register file is full, need to flush pipeline!\n")
+		 }
 
 	     //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
 	     //{
@@ -672,7 +681,13 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		       }
 			   
 			   shift_data(al_idx):= ShiftByMask(local_data, alloc_mask(al_idx))//Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
-               
+
+               when (rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
+		       {
+		          will_alloc_excpt := Bool(true)
+		          printf ("physical register file is full, need to flush pipeline!\n")
+		       }
+
 			   //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
          	   //{
                //  printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 2222: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b, wbReadsCSR = b%b\n", 
@@ -721,6 +736,12 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
 			   shift_data(al_idx):= ShiftByMask(wbresp.bits.data, alloc_mask(al_idx))//wbresp.bits.data
 
+               when (rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
+		       {
+		          will_alloc_excpt := Bool(true)
+		          printf ("physical register file is full, need to flush pipeline!\n")
+		       }
+
                //when (rename_stage.io.int_alloc_pregs(al_idx).valid)
 			   //{
                //     printf("pc = 0x%x, rob_head = %d, uop_rob_idx = %d, 3333: valid(%d) = b%b, vreg(%d) = d%d, nums(%d) = d%d, is_rob_head(%d) = b%b, can_alloc(%d)=d%d, alloc_pdst(%d)=d%d, alloc_mask(%d)=b%b\n", 
@@ -745,6 +766,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 }
 	  }
    }
+
+   rob.io.dxcpt := RegNext(will_alloc_excpt)
 
    var wu_idx = 0
    var swu_idx = 0

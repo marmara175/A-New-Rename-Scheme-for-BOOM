@@ -70,6 +70,7 @@ class RobIo(machine_width: Int,
    val lxcpt = new ValidIO(new Exception()).flip // LSU
    val bxcpt = new ValidIO(new Exception()).flip // BRU
    val cxcpt = new ValidIO(new Exception()).flip // CSR
+   val dxcpt = Bool(INPUT)						 // Physical Register Allocation Deadlock
 
    // Commit stage (free resources; also used for rollback).
    val commit = new CommitSignals(machine_width).asOutput
@@ -702,9 +703,10 @@ class Rob(width: Int,
 
    // exception must be in the commit bundle
    // Note: exception must be the first valid instruction in the commit bundle
-   exception_thrown    := will_throw_exception || io.cxcpt.valid
+   exception_thrown    := will_throw_exception || io.cxcpt.valid || io.dxcpt
    val is_mini_exception = io.com_xcpt.bits.cause === MINI_EXCEPTION_MEM_ORDERING ||
-                           io.com_xcpt.bits.cause === MINI_EXCEPTION_REPLAY
+                           io.com_xcpt.bits.cause === MINI_EXCEPTION_REPLAY || 
+						   io.dxcpt
    io.com_xcpt.valid := exception_thrown && !is_mini_exception
    io.com_xcpt.bits.cause := r_xcpt_uop.exc_cause
 

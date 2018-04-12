@@ -43,7 +43,7 @@ class DefaultBoomConfig extends Config((site, here, up) => {
       numIntVPhysRegisters = 128,
       numIntPPhysRegisters = 52,
       numFpVPhysRegisters = 128,
-      numFpPPhysRegisters = 52,
+      numFpPPhysRegisters = 128,
       numLsuEntries = 16,
       maxBrCount = 8,
       btb = BTBsaParameters(nSets=64, nWays=4, nRAS=8, tagSz=20),
