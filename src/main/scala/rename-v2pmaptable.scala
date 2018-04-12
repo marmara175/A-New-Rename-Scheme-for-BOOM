@@ -61,31 +61,16 @@ class V2PMapTableHelper(
 
     val io = new V2PMapTableIo(pipeline_width, num_vregs, num_pregs, num_read_ports, num_wb_ports, mask_sz)
 
-    val myreset = Reg(init = true.B)
-
     val v2p_maptable_pregs = Reg(init = Vec.fill(num_vregs) {UInt(0, preg_sz)})
     val v2p_maptable_masks = Reg(init = Vec.fill(num_vregs) {UInt(0, mask_sz)})
 
-    when (myreset)
-	{
-	   for (i <- 0 until 32)
-	   {
-	      v2p_maptable_pregs(i) := Wire(init = i.asUInt)
-		  v2p_maptable_masks(i) := Wire(init = ~0.U(mask_sz.W))
-		  //printf ("v2p_maptable_pregs(%d) = %d, v2p_maptable_masks(%d) = %d", 
-		  //         i.asUInt, v2p_maptable_pregs(i),
-		  //   	     i.asUInt, v2p_maptable_masks(i))
-	   }
-	}
-    
-	for (idx <- 0 until pipeline_width)
+    for (idx <- 0 until pipeline_width)
     {
         when (io.allocated_vdst(idx).valid)
 		{
 		    val vreg = io.allocated_vdst(idx).bits
 			v2p_maptable_masks(vreg) := Wire(init = UInt(0, width=mask_sz))
 			v2p_maptable_pregs(vreg) := Wire(init = UInt(0, width=preg_sz))
-			myreset := false.B
 		}
     }
 

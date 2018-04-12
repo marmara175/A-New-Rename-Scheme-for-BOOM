@@ -85,11 +85,8 @@ class RenamePFreeListHelper(
 
 	val io = new PFreeListIO(num_write_ports, pl_width, num_physical_registers)
 
-    def freelist_len = num_physical_registers * numIntPhysRegsParts
-
     // ** FREE LIST TABLE **//
-	// val freelist = Reg(init = ~Bits(0, width = num_physical_registers * numIntPhysRegsParts))
-	val freelist = Reg(init = ~"b11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111".U(width = freelist_len.W))
+	val freelist = Reg(init = ~Bits((1 << numIntPhysRegsParts)-1, width = num_physical_registers * numIntPhysRegsParts))
 	def free_list(w: Int) = freelist((w+1)*numIntPhysRegsParts-1, w*numIntPhysRegsParts)
 
     // yangqinghong new

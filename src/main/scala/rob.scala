@@ -810,7 +810,7 @@ class Rob(width: Int,
       r_xcpt_val := Bool(false)
    }
 
-   assert (!(exception_thrown && !io.cxcpt.valid && !r_xcpt_val),
+   assert (!exception_thrown || io.cxcpt.valid || r_xcpt_val || io.dxcpt,
       "ROB trying to throw an exception, but it doesn't have a valid xcpt_cause")
 
    assert (!(io.empty && r_xcpt_val),

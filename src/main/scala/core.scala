@@ -620,7 +620,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 		 }
 		 shift_data(al_idx):= ShiftByMask(ll_wbarb.io.out.bits.data, alloc_mask(al_idx))//ll_wbarb.io.out.bits.data
 
-         when (rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
+         when (rename_stage.io.int_alloc_pregs(al_idx).valid && 
+		                    rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
 		 {
 		    will_alloc_excpt := Bool(true)
 			printf ("physical register file is full, need to flush pipeline!\n")
@@ -682,7 +683,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 			   
 			   shift_data(al_idx):= ShiftByMask(local_data, alloc_mask(al_idx))//Mux(wbReadsCSR, csr.io.rw.rdata, wbresp.bits.data)
 
-               when (rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
+               when (rename_stage.io.int_alloc_pregs(al_idx).valid &&
+			                    rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
 		       {
 		          will_alloc_excpt := Bool(true)
 		          printf ("physical register file is full, need to flush pipeline!\n")
@@ -736,7 +738,8 @@ class BoomCore(implicit p: Parameters, edge: uncore.tilelink2.TLEdgeOut) extends
 
 			   shift_data(al_idx):= ShiftByMask(wbresp.bits.data, alloc_mask(al_idx))//wbresp.bits.data
 
-               when (rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
+               when (rename_stage.io.int_alloc_pregs(al_idx).valid &&
+			                          rename_stage.io.int_alloc_pregs(al_idx).is_rob_head && !can_alloc(al_idx))
 		       {
 		          will_alloc_excpt := Bool(true)
 		          printf ("physical register file is full, need to flush pipeline!\n")
